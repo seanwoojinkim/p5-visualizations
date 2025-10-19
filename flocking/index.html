@@ -96,6 +96,26 @@
             color: #e0e0e0;
             font-size: 11px;
             backdrop-filter: blur(10px);
+            min-width: 180px;
+        }
+        #keyboard-help.minimized {
+            min-width: 60px;
+            padding: 10px;
+        }
+        #keyboard-help.minimized h4,
+        #keyboard-help.minimized .key-command {
+            display: none;
+        }
+        #toggleKeyboard {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            width: 30px;
+            height: 30px;
+            padding: 0;
+            margin: 0;
+            font-size: 18px;
+            cursor: pointer;
         }
         #keyboard-help h4 {
             margin: 0 0 10px 0;
@@ -173,7 +193,8 @@
         <button id="reset">Reset Flock</button>
     </div>
 
-    <div id="keyboard-help">
+    <div id="keyboard-help" class="minimized">
+        <button id="toggleKeyboard">▲</button>
         <h4>Keyboard Commands</h4>
         <div class="key-command">
             <span class="key">S</span>

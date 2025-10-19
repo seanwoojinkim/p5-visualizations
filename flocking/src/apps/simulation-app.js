@@ -120,6 +120,15 @@ function setupToggleControls() {
         controlsPanel.classList.toggle('minimized');
         toggleButton.textContent = controlsPanel.classList.contains('minimized') ? '▶' : '◀';
     });
+
+    // Keyboard help toggle
+    const keyboardPanel = document.getElementById('keyboard-help');
+    const toggleKeyboard = document.getElementById('toggleKeyboard');
+
+    toggleKeyboard.addEventListener('click', () => {
+        keyboardPanel.classList.toggle('minimized');
+        toggleKeyboard.textContent = keyboardPanel.classList.contains('minimized') ? '▲' : '▼';
+    });
 }
 
 // Set up keyboard controls
@@ -323,13 +332,14 @@ window.draw = function() {
         const velocityOffset = boid.velocity.mag() * 3.0; // Affects phase, not rate
         const waveTime = baseWave + velocityOffset + boid.animationOffset;
 
-        // Debug: Check if this boid is escaping oscillation
-        const isEscaping = boid.getIsEscaping ? boid.getIsEscaping() : false;
+        // Debug mode: Show escaping koi in red
         let debugColor = boid.color;
-
-        if (isEscaping) {
-            // Override color to bright red for debug visualization
-            debugColor = { h: 0, s: 100, b: 90 };
+        if (debugVectors) {
+            const isEscaping = boid.getIsEscaping ? boid.getIsEscaping() : false;
+            if (isEscaping) {
+                // Override color to bright red for debug visualization
+                debugColor = { h: 0, s: 100, b: 90 };
+            }
         }
 
         renderer.render(
