@@ -18,10 +18,14 @@ let pixelBuffer;
 let renderer;
 let controlPanel;
 
-// Parameters
+// Detect mobile/small screens and adjust defaults for performance
+const isMobile = window.innerWidth < 768 || /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+const isSmallScreen = window.innerWidth < 1024;
+
+// Parameters with device-specific defaults
 let params = {
-    pixelScale: 4,
-    numBoids: 80,
+    pixelScale: isMobile ? 2 : (isSmallScreen ? 3 : 4),
+    numBoids: isMobile ? 30 : (isSmallScreen ? 50 : 80),
     maxSpeed: 0.5,
     maxForce: 0.1,
     separationWeight: 0.5,  // Reduced from 1.2 - overlap is OK in 2D top-down view
@@ -30,6 +34,11 @@ let params = {
     trailAlpha: 40,
     audioReactivity: 0.5
 };
+
+// Log device-optimized settings
+const deviceType = isMobile ? 'Mobile' : (isSmallScreen ? 'Tablet' : 'Desktop');
+console.log(`🐟 Koi Flocking - ${deviceType} detected (${window.innerWidth}x${window.innerHeight})`);
+console.log(`   Optimized defaults: ${params.numBoids} koi, pixel scale ${params.pixelScale}`);
 
 // Scatter mode state
 let scatterMode = false;

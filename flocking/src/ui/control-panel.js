@@ -7,7 +7,17 @@ export class ControlPanel {
     constructor(params, callbacks) {
         this.params = params;
         this.callbacks = callbacks;
+        this.initializeValues();
         this.setupListeners();
+    }
+
+    initializeValues() {
+        // Set initial values for all controls based on params
+        document.getElementById('pixelScaleValue').textContent = this.params.pixelScale;
+        document.getElementById('pixelScale').value = this.params.pixelScale;
+
+        document.getElementById('boidCountValue').textContent = this.params.numBoids;
+        document.getElementById('boidCount').value = this.params.numBoids;
     }
 
     setupListeners() {
