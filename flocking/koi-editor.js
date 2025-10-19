@@ -7,9 +7,13 @@ let params = {
     numSegments: 10,
     bodyWidth: 2.4,
     bodyHeight: 0.95,
-    headX: -0.4,
-    headWidth: 7,
-    headHeight: 5.5,
+    headX: -0.6,
+    headWidth: 7.5,
+    headHeight: 5.0,
+    eyeX: 1.3,
+    eyeYTop: -2.2,
+    eyeYBottom: 2.0,
+    eyeSize: 1.0,
     tailStartX: -1,
     tailWidthStart: 0.2,
     tailWidthEnd: 1.5,
@@ -141,10 +145,14 @@ function drawKoi() {
     ellipse(headSeg.x + params.headX * sizeScale, headSeg.y,
             params.headWidth * sizeScale, params.headHeight * sizeScale);
 
-    // Eye
+    // Eyes (both sides)
     fill(20);
-    ellipse(headSeg.x + 2.5 * sizeScale, headSeg.y - 1 * sizeScale,
-            1.2 * sizeScale, 1.2 * sizeScale);
+    // Left eye (top)
+    ellipse(headSeg.x + params.eyeX * sizeScale, headSeg.y + params.eyeYTop * sizeScale,
+            params.eyeSize * sizeScale, params.eyeSize * sizeScale);
+    // Right eye (bottom)
+    ellipse(headSeg.x + params.eyeX * sizeScale, headSeg.y + params.eyeYBottom * sizeScale,
+            params.eyeSize * sizeScale, params.eyeSize * sizeScale);
 
     // Draw tail
     drawTail(segmentPositions, waveTime);
@@ -371,7 +379,8 @@ function mouseReleased() {
 
 function setupInputs() {
     const inputs = ['numSegments', 'bodyWidth', 'bodyHeight', 'headX', 'headWidth',
-                    'headHeight', 'tailStartX', 'tailWidthStart', 'tailWidthEnd',
+                    'headHeight', 'eyeX', 'eyeYTop', 'eyeYBottom', 'eyeSize',
+                    'tailStartX', 'tailWidthStart', 'tailWidthEnd',
                     'tailSplit', 'dorsalPos', 'dorsalY', 'pectoralPos', 'pectoralYTop',
                     'pectoralAngleTop', 'pectoralYBottom', 'pectoralAngleBottom',
                     'ventralPos', 'ventralYTop', 'ventralAngleTop', 'ventralYBottom', 'ventralAngleBottom'];
@@ -400,6 +409,10 @@ bodyHeight: ${params.bodyHeight.toFixed(2)}
 headX: ${params.headX.toFixed(1)}
 headWidth: ${params.headWidth.toFixed(1)}
 headHeight: ${params.headHeight.toFixed(1)}
+eyeX: ${params.eyeX.toFixed(1)}
+eyeYTop: ${params.eyeYTop.toFixed(1)}
+eyeYBottom: ${params.eyeYBottom.toFixed(1)}
+eyeSize: ${params.eyeSize.toFixed(1)}
 
 // Tail
 tailStartX: ${params.tailStartX.toFixed(1)}

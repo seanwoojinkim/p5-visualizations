@@ -14,7 +14,7 @@ let isPlaying = false;
 let params = {
     pixelScale: 4,
     numBoids: 80,
-    maxSpeed: 2,
+    maxSpeed: 1,
     maxForce: 0.1,
     separationWeight: 1.2,
     alignmentWeight: 1.2,
@@ -752,9 +752,9 @@ class Boid {
         let smoothing = 0.15;  // Much more smoothing to eliminate vibration
         this.velocity.lerp(targetVelocity, smoothing);
 
-        // Cap acceleration to prevent jerky movements
-        this.acceleration.limit(params.maxForce * 1.5);
-        this.acceleration.mult(0);
+        // Reset acceleration to zero for next frame
+        // Use set() instead of mult(0) to avoid floating-point residuals accumulating
+        this.acceleration.set(0, 0, 0);
 
         this.edges();
     }
@@ -976,7 +976,7 @@ class Boid {
         pg.beginShape();
 
         // Start with head point and add as duplicate for curve control
-        let headPt = { x: headSeg.x + -0.4 * sizeScale, y: headSeg.y };
+        let headPt = { x: headSeg.x + -0.6 * sizeScale, y: headSeg.y };
         pg.curveVertex(headPt.x, headPt.y);
 
         // Head point (actual)
@@ -1023,11 +1023,14 @@ class Boid {
 
         // Head detail
         pg.fill(hue, saturation, brightness + 2, 0.92);
-        pg.ellipse(headSeg.x + -0.4 * sizeScale, headSeg.y, 7 * sizeScale, 5.5 * sizeScale);
+        pg.ellipse(headSeg.x + -0.6 * sizeScale, headSeg.y, 7.5 * sizeScale, 5.0 * sizeScale);
 
-        // Eye
+        // Eyes (both sides)
         pg.fill(0, 0, 10, 0.8);
-        pg.ellipse(headSeg.x + 2.5 * sizeScale, headSeg.y - 1 * sizeScale, 1.2 * sizeScale, 1.2 * sizeScale);
+        // Left eye (top)
+        pg.ellipse(headSeg.x + 1.3 * sizeScale, headSeg.y - 2.2 * sizeScale, 1.0 * sizeScale, 1.0 * sizeScale);
+        // Right eye (bottom)
+        pg.ellipse(headSeg.x + 1.3 * sizeScale, headSeg.y + 2.0 * sizeScale, 1.0 * sizeScale, 1.0 * sizeScale);
 
         pg.pop();
 
