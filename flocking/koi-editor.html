@@ -88,6 +88,19 @@
             <p style="font-size: 11px; color: #888;">Drag the colored control points to adjust the shape</p>
 
             <div class="section">
+                <h3 style="font-size: 12px; color: #6ac0ff;">Koi Variety</h3>
+                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+                    <button id="prevVariety" style="width: 40px; padding: 5px;">←</button>
+                    <div style="flex: 1; text-align: center;">
+                        <div id="varietyName" style="font-size: 13px; font-weight: bold; color: #e0e0e0; margin-bottom: 4px;">Kohaku</div>
+                        <div id="varietyIndex" style="font-size: 10px; color: #888;">1 / 28</div>
+                    </div>
+                    <button id="nextVariety" style="width: 40px; padding: 5px;">→</button>
+                </div>
+                <button id="regeneratePattern" style="margin-top: 0; font-size: 11px;">Regenerate Pattern</button>
+            </div>
+
+            <div class="section">
                 <h3 style="font-size: 12px; color: #6ac0ff;">Body Shape</h3>
                 <div class="param">
                     <label>Number of Segments</label>
@@ -100,6 +113,30 @@
                 <div class="param">
                     <label>Body Height Multiplier</label>
                     <input type="number" id="bodyHeight" value="0.95" step="0.05">
+                </div>
+                <div class="param">
+                    <label>Taper Start Position (0-1)</label>
+                    <input type="number" id="bodyTaperStart" value="0.15" step="0.05" min="0" max="1">
+                </div>
+                <div class="param">
+                    <label>Taper Strength (0-1)</label>
+                    <input type="number" id="bodyTaperStrength" value="0.9" step="0.05" min="0" max="1">
+                </div>
+                <div class="param">
+                    <label>Peak Width Position (0-1)</label>
+                    <input type="number" id="bodyPeakPosition" value="0.7" step="0.05" min="0" max="1">
+                </div>
+                <div class="param">
+                    <label>Peak Width</label>
+                    <input type="number" id="bodyPeakWidth" value="8.0" step="0.5" min="3" max="10">
+                </div>
+                <div class="param">
+                    <label>Front Width</label>
+                    <input type="number" id="bodyFrontWidth" value="4.5" step="0.5" min="2" max="8">
+                </div>
+                <div class="param">
+                    <label>Belly/Back Asymmetry (-1 to 1)</label>
+                    <input type="number" id="bodyAsymmetry" value="0.9" step="0.1" min="-1" max="1">
                 </div>
             </div>
 
@@ -215,6 +252,6 @@
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.7.0/p5.min.js"></script>
-    <script src="koi-editor.js"></script>
+    <script type="module" src="src/apps/editor-app.js"></script>
 </body>
 </html>
