@@ -86,6 +86,35 @@
             font-size: 14px;
             text-transform: uppercase;
         }
+        #keyboard-help {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(20, 20, 25, 0.9);
+            padding: 15px;
+            border-radius: 4px;
+            color: #e0e0e0;
+            font-size: 11px;
+            backdrop-filter: blur(10px);
+        }
+        #keyboard-help h4 {
+            margin: 0 0 10px 0;
+            color: #6ac0ff;
+            font-size: 12px;
+        }
+        .key-command {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 5px;
+            gap: 15px;
+        }
+        .key {
+            background: #2a2a35;
+            padding: 2px 8px;
+            border-radius: 3px;
+            font-weight: bold;
+            color: #6ac0ff;
+        }
     </style>
 </head>
 <body>
@@ -104,13 +133,13 @@
         </div>
 
         <div class="control-group">
-            <label>Max Speed <span class="value" id="maxSpeedValue">1.0</span></label>
-            <input type="range" id="maxSpeed" min="0.5" max="10" value="1" step="0.5">
+            <label>Max Speed <span class="value" id="maxSpeedValue">0.5</span></label>
+            <input type="range" id="maxSpeed" min="0.25" max="1.5" value="0.5" step="0.05">
         </div>
 
         <div class="control-group">
-            <label>Separation <span class="value" id="separationValue">1.2</span></label>
-            <input type="range" id="separation" min="0" max="3" value="1.2" step="0.1">
+            <label>Separation <span class="value" id="separationValue">0.5</span></label>
+            <input type="range" id="separation" min="0" max="3" value="0.5" step="0.1">
         </div>
 
         <div class="control-group">
@@ -142,6 +171,26 @@
 
         <button id="playPause" disabled>Play Audio</button>
         <button id="reset">Reset Flock</button>
+    </div>
+
+    <div id="keyboard-help">
+        <h4>Keyboard Commands</h4>
+        <div class="key-command">
+            <span class="key">S</span>
+            <span>Scatter koi</span>
+        </div>
+        <div class="key-command">
+            <span class="key">R</span>
+            <span>Reset flock</span>
+        </div>
+        <div class="key-command">
+            <span class="key">C</span>
+            <span>Toggle controls</span>
+        </div>
+        <div class="key-command">
+            <span class="key">D</span>
+            <span>Debug vectors</span>
+        </div>
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.7.0/p5.min.js"></script>

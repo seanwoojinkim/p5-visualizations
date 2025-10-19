@@ -138,6 +138,27 @@ export function calculateSeparation(boid, neighbors, perceptionRadius, maxSpeed,
 }
 
 /**
+ * Calculate escape steering force to break out of oscillation
+ * Steer towards a direction 45-90 degrees from current heading
+ * @param {Object} boid - The boid
+ * @param {number} escapeDirection - Target heading in radians
+ * @param {number} maxSpeed - Maximum speed
+ * @param {number} maxForce - Maximum steering force
+ * @param {Object} p5 - p5 instance for Vector operations
+ * @returns {Object} - Steering force vector
+ */
+export function calculateEscapeForce(boid, escapeDirection, maxSpeed, maxForce, p5) {
+    // Create a target velocity in the escape direction
+    const targetVelocity = p5.Vector.fromAngle(escapeDirection, maxSpeed * 1.2);
+
+    // Calculate steering force to reach that velocity
+    const steering = p5.Vector.sub(targetVelocity, boid.velocity);
+    steering.limit(maxForce * 2); // Stronger force to break out of oscillation
+
+    return steering;
+}
+
+/**
  * Helper: Calculate distance between two points
  */
 function dist(x1, y1, x2, y2) {

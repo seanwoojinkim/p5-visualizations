@@ -61,14 +61,23 @@ export class Boid {
         this.independenceCheckInterval = randomFunc(180, 600); // Check every 3-10 seconds at 60fps
         this.independenceFrameCounter = 0;
         this.independenceChance = randomFunc(0.05, 0.15); // 5-15% chance when checking
+
+        // Oscillation escape behavior
+        this.isEscaping = false;
+        this.escapeEndTime = 0;
+        this.escapeDirection = null;
+        this.escapeCooldownEndTime = 0; // Prevent immediate re-triggering
     }
 
     /**
      * Apply forces to the boid's acceleration
      * Smooths forces over time to reduce jittery behavior
+     * Implements force prioritization to reduce conflicts
      * @param {Object} forces - Object containing force vectors {alignment, cohesion, separation}
+     * @param {number} neighborCount - Number of neighbors affecting this boid
+     * @param {Function} randomFunc - Random function for triggering escape
      */
-    applyForces(forces) {
+    applyForces(forces, neighborCount = 0, randomFunc = Math.random) {
         // Smooth forces by blending with previous frame
         // This reduces rapid oscillations when forces conflict
         const forceSmoothing = 0.25; // Increased from 0.15 - more responsive with damping
@@ -91,9 +100,50 @@ export class Boid {
         this.previousCohesion = forces.cohesion.copy();
         this.previousSeparation = forces.separation.copy();
 
-        // Apply smoothed forces
-        // Note: In 2D top-down view, koi can overlap (swimming over/under)
-        // so we don't need aggressive separation
+        // FORCE PRIORITIZATION - Prevent oscillation from conflicting forces
+        // When too close to neighbors, separation dominates
+        const separationMag = smoothedSeparation.mag();
+
+        let alignmentWeight = 1.0;
+        let cohesionWeight = 1.0;
+        let separationWeight = 1.0;
+
+        if (separationMag > 0.05) {
+            // High separation need - fish are too close
+            // Separation dominates (90%), others reduced
+            separationWeight = 0.9;
+            alignmentWeight = 0.1;
+            cohesionWeight = 0.1;
+        } else if (separationMag > 0.02) {
+            // Moderate separation need
+            // Separation emphasized (70%), others balanced
+            separationWeight = 0.7;
+            alignmentWeight = 0.5;
+            cohesionWeight = 0.5;
+        }
+        // else: balanced weights (all 1.0)
+
+        // Apply weighted forces
+        smoothedAlignment.mult(alignmentWeight);
+        smoothedCohesion.mult(cohesionWeight);
+        smoothedSeparation.mult(separationWeight);
+
+        // OVERCROWDING DETECTION - Escape if too many neighbors or forces too high
+        const totalForceMag = smoothedAlignment.mag() + smoothedCohesion.mag() + smoothedSeparation.mag();
+        const now = Date.now();
+
+        // Trigger escape if:
+        // 1. Too many neighbors (>15 = overcrowding)
+        // 2. Total force magnitude too high (>0.25 = force overload)
+        if (!this.isEscaping && now > this.escapeCooldownEndTime) {
+            if (neighborCount > 15 || totalForceMag > 0.25) {
+                this.triggerEscapeManeuver(randomFunc);
+                // Clear heading history to reset oscillation detection
+                this.headingHistory = [];
+            }
+        }
+
+        // Apply smoothed and weighted forces
         this.acceleration.add(smoothedAlignment);
         this.acceleration.add(smoothedCohesion);
         this.acceleration.add(smoothedSeparation);
@@ -108,6 +158,9 @@ export class Boid {
      * @param {Function} randomFunc - Random function for independence checks
      */
     update(maxSpeed, audioAmplitude, audioReactivity, p5, randomFunc) {
+        // Update escape behavior
+        this.updateEscape();
+
         // Update independence behavior
         this.updateIndependence(randomFunc);
 
@@ -120,7 +173,7 @@ export class Boid {
         while (headingChange < -Math.PI) headingChange += Math.PI * 2;
 
         // Calculate damping force perpendicular to velocity
-        const dampingCoefficient = 0.15; // Tuning parameter: higher = more resistance to turning (reduced from 0.3)
+        const dampingCoefficient = 0.45; // Tuning parameter: higher = more resistance to turning
         const speed = this.velocity.mag();
 
         if (speed > 0.1) { // Only apply damping if moving
@@ -183,15 +236,13 @@ export class Boid {
                 }
 
                 // If we have 3+ reversals in last 6 frames, that's oscillation
-                if (reversals >= 3) {
-                    console.log(`Oscillation detected: ${reversals} reversals in last ${this.headingHistory.length} frames`, {
-                        position: `(${this.position.x.toFixed(1)}, ${this.position.y.toFixed(1)})`,
-                        variety: this.variety.name,
-                        speed: this.velocity.mag().toFixed(2),
-                        isIndependent: this.isIndependent,
-                        changePattern: changes.map(c => (c * 180 / Math.PI).toFixed(1) + '°').join(', ')
-                    });
-                    // Clear history after logging to avoid spam
+                // But only trigger if not in cooldown period
+                const now = Date.now();
+                if (reversals >= 3 && !this.isEscaping && now > this.escapeCooldownEndTime) {
+                    // Trigger escape maneuver
+                    this.triggerEscapeManeuver(randomFunc);
+
+                    // Clear history after triggering escape
                     this.headingHistory = [];
                 }
             }
@@ -228,6 +279,57 @@ export class Boid {
                     this.independenceTimer = this.independenceDuration;
                 }
             }
+        }
+    }
+
+    /**
+     * Trigger escape maneuver to break out of oscillation
+     * @param {Function} randomFunc - Random function
+     */
+    triggerEscapeManeuver(randomFunc) {
+        this.isEscaping = true;
+        this.escapeEndTime = Date.now() + randomFunc(1500, 3000); // Escape for 0.8-1.5 seconds
+
+        // Pick a direction 45-90 degrees away from current heading
+        const currentHeading = this.velocity.heading();
+        const angleOffset = randomFunc(Math.PI / 4, Math.PI / 2); // 45-90 degrees
+        const direction = randomFunc() > 0.5 ? 1 : -1; // Randomly left or right
+
+        this.escapeDirection = currentHeading + (angleOffset * direction);
+    }
+
+    /**
+     * Check if this boid is currently escaping oscillation
+     * @returns {boolean}
+     */
+    getIsEscaping() {
+        return this.isEscaping && Date.now() < this.escapeEndTime;
+    }
+
+    /**
+     * Get the escape direction if currently escaping
+     * @returns {number|null} - Heading in radians, or null
+     */
+    getEscapeDirection() {
+        if (this.getIsEscaping()) {
+            return this.escapeDirection;
+        }
+        return null;
+    }
+
+    /**
+     * Update escape state
+     */
+    updateEscape() {
+        if (this.isEscaping && Date.now() >= this.escapeEndTime) {
+            this.isEscaping = false;
+            this.escapeDirection = null;
+
+            // Set cooldown period of 3-5 seconds to prevent immediate re-triggering
+            this.escapeCooldownEndTime = Date.now() + (Math.random() * 2000 + 3000);
+
+            // Clear heading history to reset oscillation detection
+            this.headingHistory = [];
         }
     }
 
