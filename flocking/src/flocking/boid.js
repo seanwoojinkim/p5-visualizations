@@ -51,6 +51,9 @@ export class Boid {
         // Speed variation - each koi has its own preferred speed around the global max
         this.speedMultiplier = randomFunc(0.6, 1.3);
 
+        // Animation offset - each koi undulates at a different phase
+        this.animationOffset = randomFunc(0, Math.PI * 2); // Random phase offset (0 to 2π)
+
         // Independence behavior
         this.isIndependent = false;
         this.independenceTimer = 0;

@@ -105,7 +105,8 @@ window.draw = function() {
 
     // Render each boid
     for (let boid of flock.boids) {
-        const waveTime = frameCount * 0.1 * (1 + boid.velocity.mag() * 0.3);
+        // Each koi has unique animation phase offset so they don't all undulate in sync
+        const waveTime = frameCount * 0.1 * (1 + boid.velocity.mag() * 0.3) + boid.animationOffset;
 
         renderer.render(
             pg,
