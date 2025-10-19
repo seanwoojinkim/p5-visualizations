@@ -46,12 +46,26 @@ window.setup = function() {
     // Set up variety controls
     setupVarietyControls();
 
+    // Set up toggle controls
+    setupToggleControls();
+
     // Initialize with first variety
     updateVariety(0);
 
     // Initial output update
     controls.updateOutput();
 };
+
+// Set up toggle controls
+function setupToggleControls() {
+    const controlsPanel = document.getElementById('controls');
+    const toggleButton = document.getElementById('toggleControls');
+
+    toggleButton.addEventListener('click', () => {
+        controlsPanel.classList.toggle('minimized');
+        toggleButton.textContent = controlsPanel.classList.contains('minimized') ? '▶' : '◀';
+    });
+}
 
 // Set up variety selection controls
 function setupVarietyControls() {

@@ -88,7 +88,21 @@ window.setup = function() {
             flock.reset();
         }
     });
+
+    // Set up toggle controls
+    setupToggleControls();
 };
+
+// Set up toggle controls
+function setupToggleControls() {
+    const controlsPanel = document.getElementById('controls');
+    const toggleButton = document.getElementById('toggleControls');
+
+    toggleButton.addEventListener('click', () => {
+        controlsPanel.classList.toggle('minimized');
+        toggleButton.textContent = controlsPanel.classList.contains('minimized') ? '▶' : '◀';
+    });
+}
 
 // p5.js draw function
 window.draw = function() {

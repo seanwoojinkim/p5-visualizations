@@ -29,6 +29,27 @@
             min-width: 200px;
             backdrop-filter: blur(10px);
         }
+        #controls.minimized {
+            min-width: 60px;
+            padding: 10px;
+        }
+        #controls.minimized h3,
+        #controls.minimized .control-group,
+        #controls.minimized hr,
+        #controls.minimized button:not(#toggleControls) {
+            display: none;
+        }
+        #toggleControls {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            width: 30px;
+            height: 30px;
+            padding: 0;
+            margin: 0;
+            font-size: 18px;
+            cursor: pointer;
+        }
         .control-group {
             margin-bottom: 15px;
         }
@@ -68,7 +89,8 @@
     </style>
 </head>
 <body>
-    <div id="controls">
+    <div id="controls" class="minimized">
+        <button id="toggleControls">▶</button>
         <h3>Controls</h3>
 
         <div class="control-group">
