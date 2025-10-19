@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Koi Shape Editor</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #0a140f;
+            font-family: 'Courier New', monospace;
+            color: #e0e0e0;
+        }
+        canvas {
+            display: block;
+            border: 1px solid #333;
+        }
+        #container {
+            display: flex;
+            padding: 20px;
+            gap: 20px;
+        }
+        #controls {
+            background: rgba(20, 20, 25, 0.9);
+            padding: 20px;
+            border-radius: 4px;
+            max-width: 400px;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+        h2 {
+            margin-top: 0;
+            color: #6ac0ff;
+        }
+        .param {
+            margin-bottom: 10px;
+            font-size: 11px;
+        }
+        .param label {
+            display: block;
+            color: #a0a0a0;
+            margin-bottom: 3px;
+        }
+        .param input {
+            width: 60px;
+            background: #1a1a25;
+            border: 1px solid #404050;
+            color: #e0e0e0;
+            padding: 4px;
+            font-family: 'Courier New', monospace;
+        }
+        button {
+            width: 100%;
+            padding: 10px;
+            margin-top: 10px;
+            background: #2a2a35;
+            border: 1px solid #404050;
+            color: #e0e0e0;
+            cursor: pointer;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+        }
+        button:hover {
+            background: #353545;
+        }
+        .section {
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #404050;
+        }
+        #output {
+            background: #1a1a25;
+            padding: 10px;
+            border-radius: 3px;
+            font-size: 10px;
+            white-space: pre;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <div id="canvasContainer">
+        </div>
+        <div id="controls">
+            <h2>Koi Shape Editor</h2>
+            <p style="font-size: 11px; color: #888;">Drag the colored control points to adjust the shape</p>
+
+            <div class="section">
+                <h3 style="font-size: 12px; color: #6ac0ff;">Body Shape</h3>
+                <div class="param">
+                    <label>Number of Segments</label>
+                    <input type="number" id="numSegments" value="10" min="5" max="20">
+                </div>
+                <div class="param">
+                    <label>Body Width Multiplier</label>
+                    <input type="number" id="bodyWidth" value="2.4" step="0.1">
+                </div>
+                <div class="param">
+                    <label>Body Height Multiplier</label>
+                    <input type="number" id="bodyHeight" value="0.95" step="0.05">
+                </div>
+            </div>
+
+            <div class="section">
+                <h3 style="font-size: 12px; color: #6ac0ff;">Head</h3>
+                <div class="param">
+                    <label>Head Offset X</label>
+                    <input type="number" id="headX" value="-0.4" step="0.1">
+                </div>
+                <div class="param">
+                    <label>Head Width</label>
+                    <input type="number" id="headWidth" value="7" step="0.5">
+                </div>
+                <div class="param">
+                    <label>Head Height</label>
+                    <input type="number" id="headHeight" value="5.5" step="0.5">
+                </div>
+            </div>
+
+            <div class="section">
+                <h3 style="font-size: 12px; color: #6ac0ff;">Tail</h3>
+                <div class="param">
+                    <label>Tail Start Offset</label>
+                    <input type="number" id="tailStartX" value="-1" step="0.5">
+                </div>
+                <div class="param">
+                    <label>Tail Width (start)</label>
+                    <input type="number" id="tailWidthStart" value="0.2" step="0.1">
+                </div>
+                <div class="param">
+                    <label>Tail Width (end)</label>
+                    <input type="number" id="tailWidthEnd" value="1.5" step="0.1">
+                </div>
+                <div class="param">
+                    <label>Split Height</label>
+                    <input type="number" id="tailSplit" value="0.5" step="0.1">
+                </div>
+            </div>
+
+            <div class="section">
+                <h3 style="font-size: 12px; color: #6ac0ff;">Fins</h3>
+                <div class="param">
+                    <label>Dorsal Fin Position (segment)</label>
+                    <input type="number" id="dorsalPos" value="4" min="0" max="9">
+                </div>
+                <div class="param">
+                    <label>Dorsal Fin Offset Y</label>
+                    <input type="number" id="dorsalY" value="-0.5" step="0.5">
+                </div>
+                <div class="param">
+                    <label>Pectoral Fin Position (segment)</label>
+                    <input type="number" id="pectoralPos" value="2" min="0" max="9">
+                </div>
+                <div class="param">
+                    <label>Pectoral Fin Top Offset Y</label>
+                    <input type="number" id="pectoralYTop" value="-2" step="0.5">
+                </div>
+                <div class="param">
+                    <label>Pectoral Fin Top Angle</label>
+                    <input type="number" id="pectoralAngleTop" value="-2.5" step="0.1">
+                </div>
+                <div class="param">
+                    <label>Pectoral Fin Bottom Offset Y</label>
+                    <input type="number" id="pectoralYBottom" value="2" step="0.5">
+                </div>
+                <div class="param">
+                    <label>Pectoral Fin Bottom Angle</label>
+                    <input type="number" id="pectoralAngleBottom" value="2.1" step="0.1">
+                </div>
+                <div class="param">
+                    <label>Ventral Fin Position (segment)</label>
+                    <input type="number" id="ventralPos" value="7" min="0" max="9">
+                </div>
+                <div class="param">
+                    <label>Ventral Fin Top Offset Y</label>
+                    <input type="number" id="ventralYTop" value="-1" step="0.5">
+                </div>
+                <div class="param">
+                    <label>Ventral Fin Top Angle</label>
+                    <input type="number" id="ventralAngleTop" value="-2.5" step="0.1">
+                </div>
+                <div class="param">
+                    <label>Ventral Fin Bottom Offset Y</label>
+                    <input type="number" id="ventralYBottom" value="1" step="0.5">
+                </div>
+                <div class="param">
+                    <label>Ventral Fin Bottom Angle</label>
+                    <input type="number" id="ventralAngleBottom" value="2.5" step="0.1">
+                </div>
+            </div>
+
+            <button id="copyValues">Copy Values to Clipboard</button>
+
+            <h3 style="font-size: 12px; color: #6ac0ff; margin-top: 20px;">Current Values</h3>
+            <div id="output"></div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.7.0/p5.min.js"></script>
+    <script src="koi-editor.js"></script>
+</body>
+</html>
