@@ -44,22 +44,23 @@ export class BrushTextures {
         pg.noStroke();
 
         // Create flowing horizontal brush strokes with fiber texture
-        for (let i = 0; i < 800; i++) {
+        // Much lighter for subtle effect
+        for (let i = 0; i < 400; i++) {
             const x = random(0, 512);
             const y = random(0, 256);
             const len = random(20, 80);
             const thickness = random(1, 4);
-            const alpha = random(30, 150);
+            const alpha = random(5, 35); // Reduced from 30-150
 
             pg.fill(0, alpha);
             pg.ellipse(x, y, len, thickness);
         }
 
-        // Add fiber detail
-        for (let i = 0; i < 1500; i++) {
+        // Add fiber detail - very subtle
+        for (let i = 0; i < 800; i++) {
             const x = random(0, 512);
             const y = random(0, 256);
-            const alpha = random(10, 60);
+            const alpha = random(3, 20); // Reduced from 10-60
             pg.fill(0, alpha);
             pg.ellipse(x, y, random(1, 3), random(0.5, 2));
         }
@@ -86,23 +87,23 @@ export class BrushTextures {
         pg.background(255);
         pg.noStroke();
 
-        // Delicate, wispy strokes for fins
-        for (let i = 0; i < 300; i++) {
+        // Delicate, wispy strokes for fins - very light
+        for (let i = 0; i < 150; i++) {
             const x = random(0, 256);
             const y = random(0, 128);
             const len = random(10, 40);
             const thickness = random(0.5, 2);
-            const alpha = random(20, 100);
+            const alpha = random(5, 30); // Reduced from 20-100
 
             pg.fill(0, alpha);
             pg.ellipse(x, y, len, thickness);
         }
 
         // Subtle fiber detail
-        for (let i = 0; i < 500; i++) {
+        for (let i = 0; i < 250; i++) {
             const x = random(0, 256);
             const y = random(0, 128);
-            const alpha = random(5, 40);
+            const alpha = random(2, 15); // Reduced from 5-40
             pg.fill(0, alpha);
             pg.ellipse(x, y, random(1, 2), random(0.3, 1));
         }
@@ -119,23 +120,23 @@ export class BrushTextures {
         pg.background(255);
         pg.noStroke();
 
-        // Flowing, dynamic strokes for tail
-        for (let i = 0; i < 600; i++) {
+        // Flowing, dynamic strokes for tail - lighter
+        for (let i = 0; i < 300; i++) {
             const x = random(0, 512);
             const y = random(0, 128);
             const len = random(30, 120);
             const thickness = random(1, 5);
-            const alpha = random(25, 140);
+            const alpha = random(5, 40); // Reduced from 25-140
 
             pg.fill(0, alpha);
             pg.ellipse(x, y, len, thickness);
         }
 
-        // Add flowing detail
-        for (let i = 0; i < 1000; i++) {
+        // Add flowing detail - subtle
+        for (let i = 0; i < 500; i++) {
             const x = random(0, 512);
             const y = random(0, 128);
-            const alpha = random(10, 50);
+            const alpha = random(3, 20); // Reduced from 10-50
             pg.fill(0, alpha);
             pg.ellipse(x, y, random(2, 5), random(0.5, 2));
         }
@@ -152,17 +153,17 @@ export class BrushTextures {
         pg.background(255);
         pg.noStroke();
 
-        // Organic spot texture with soft edges
+        // Organic spot texture with soft edges - very subtle
         const centerX = 128;
         const centerY = 128;
 
-        for (let i = 0; i < 500; i++) {
+        for (let i = 0; i < 300; i++) {
             const angle = random(0, Math.PI * 2);
             const radius = random(0, 80);
             const x = centerX + Math.cos(angle) * radius;
             const y = centerY + Math.sin(angle) * radius;
             const size = random(3, 15);
-            const alpha = random(40, 150) * (1 - radius / 80);
+            const alpha = random(5, 40) * (1 - radius / 80); // Reduced from 40-150
 
             pg.fill(0, alpha);
             pg.ellipse(x, y, size, size);

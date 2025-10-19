@@ -25,8 +25,9 @@ export class KoiRenderer {
      * @param {number} width - Width to scale texture
      * @param {number} height - Height to scale texture
      * @param {number} rotation - Rotation angle in radians (default: 0)
+     * @param {number} opacity - Opacity of texture overlay 0-1 (default: 0.3)
      */
-    applyBrushTexture(context, textureName, x, y, width, height, rotation = 0) {
+    applyBrushTexture(context, textureName, x, y, width, height, rotation = 0, opacity = 0.3) {
         if (!this.useSumieStyle) return;
 
         const texture = this.brushTextures.get(textureName);
@@ -39,7 +40,9 @@ export class KoiRenderer {
         // Use MULTIPLY blend mode for ink effect
         // Dark values in texture darken the underlying color, white stays transparent
         context.blendMode(context.MULTIPLY);
+        context.tint(255, opacity * 255); // Apply opacity to texture
         context.image(texture, -width/2, -height/2, width, height);
+        context.noTint(); // Reset tint
         context.blendMode(context.BLEND); // Reset to normal blending
 
         context.pop();
@@ -253,13 +256,13 @@ export class KoiRenderer {
 
         context.endShape(context.CLOSE);
 
-        // Apply brush texture overlay for flowing tail effect
+        // Apply brush texture overlay for flowing tail effect - subtle
         if (this.useSumieStyle) {
             const tailCenterX = (topPoints[3].x + bottomPoints[3].x) / 2;
             const tailCenterY = (topPoints[3].y + bottomPoints[3].y) / 2;
-            const tailWidth = tailLengthScaled * 1.2;
-            const tailHeight = shapeParams.tailWidthStart * sizeScale * 3;
-            this.applyBrushTexture(context, 'tail', tailCenterX, tailCenterY, tailWidth, tailHeight);
+            const tailWidth = tailLengthScaled * 1.0;
+            const tailHeight = shapeParams.tailWidthStart * sizeScale * 2.5;
+            this.applyBrushTexture(context, 'tail', tailCenterX, tailCenterY, tailWidth, tailHeight, 0, 0.25);
         }
     }
 
@@ -314,15 +317,16 @@ export class KoiRenderer {
         }
         context.noStroke();
 
-        // Apply brush texture overlay for sumi-e aesthetic
+        // Apply brush texture overlay for sumi-e aesthetic - very subtle
         if (this.useSumieStyle) {
-            // Apply texture to middle segments of body
+            // Apply texture only to a few segments to avoid over-darkening
             const bodyLength = segmentPositions.length;
-            for (let i = 2; i < bodyLength - 2; i++) {
+            // Only apply to every other segment, and skip head/tail areas
+            for (let i = 3; i < bodyLength - 3; i += 2) {
                 const seg = segmentPositions[i];
-                const textureWidth = seg.w * 2;
-                const textureHeight = seg.w * 1.5;
-                this.applyBrushTexture(context, 'body', seg.x, seg.y, textureWidth, textureHeight);
+                const textureWidth = seg.w * 2.5;
+                const textureHeight = seg.w * 2;
+                this.applyBrushTexture(context, 'body', seg.x, seg.y, textureWidth, textureHeight, 0, 0.2);
             }
         }
     }
@@ -341,10 +345,10 @@ export class KoiRenderer {
             const spotH = spot.size * sizeScale * 0.8;
             context.ellipse(seg.x, seg.y + spot.offsetY * sizeScale, spotW, spotH);
 
-            // Apply brush texture to each spot for organic edges
+            // Apply brush texture to each spot for organic edges - very subtle
             if (this.useSumieStyle) {
-                const textureSize = spot.size * sizeScale * 1.3;
-                this.applyBrushTexture(context, 'spot', seg.x, seg.y + spot.offsetY * sizeScale, textureSize, textureSize);
+                const textureSize = spot.size * sizeScale * 1.1;
+                this.applyBrushTexture(context, 'spot', seg.x, seg.y + spot.offsetY * sizeScale, textureSize, textureSize, 0, 0.15);
             }
         }
     }
