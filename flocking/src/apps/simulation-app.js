@@ -10,6 +10,7 @@ import { PixelBuffer } from '../rendering/pixel-buffer.js';
 import { KoiRenderer } from '../core/koi-renderer.js';
 import { DEFAULT_SHAPE_PARAMS } from '../core/koi-params.js';
 import { ControlPanel } from '../ui/control-panel.js';
+import { BrushTextures } from '../rendering/brush-textures.js';
 
 // Global state
 let flock;
@@ -17,6 +18,7 @@ let audio;
 let pixelBuffer;
 let renderer;
 let controlPanel;
+let brushTextures;
 
 // Detect mobile/small screens and adjust defaults for performance
 const isMobile = window.innerWidth < 768 || /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
@@ -24,7 +26,7 @@ const isSmallScreen = window.innerWidth < 1024;
 
 // Parameters with device-specific defaults
 let params = {
-    pixelScale: isMobile ? 2 : (isSmallScreen ? 3 : 4),
+    pixelScale: isMobile ? 3 : (isSmallScreen ? 3 : 4),
     numBoids: isMobile ? 30 : (isSmallScreen ? 50 : 80),
     maxSpeed: 0.5,
     maxForce: 0.1,
@@ -40,14 +42,7 @@ const deviceType = isMobile ? 'Mobile' : (isSmallScreen ? 'Tablet' : 'Desktop');
 console.log(`🐟 Koi Flocking - ${deviceType} detected (${window.innerWidth}x${window.innerHeight})`);
 console.log(`   Optimized defaults: ${params.numBoids} koi, pixel scale ${params.pixelScale}`);
 
-// Scatter mode state
-let scatterMode = false;
-let scatterEndTime = 0;
-let scatterVectors = [];
-let scatterEaseTime = 2000; // 2 seconds to ease back into flocking
-
-// Individual scatter state for each boid
-let individualScatterData = [];
+// Scatter mode is now handled inside each boid
 
 // Debug mode
 let debugVectors = false;
@@ -84,11 +79,12 @@ window.setup = function() {
         }
     );
 
-    // Initialize individual scatter data for each boid
-    initializeIndividualScatter();
+    // Initialize brush textures for sumi-e rendering
+    brushTextures = new BrushTextures();
+    brushTextures.generate(createGraphics, random);
 
-    // Initialize koi renderer
-    renderer = new KoiRenderer();
+    // Initialize koi renderer with brush textures
+    renderer = new KoiRenderer(brushTextures);
 
     // Initialize control panel
     controlPanel = new ControlPanel(params, {
@@ -146,7 +142,7 @@ function setupKeyboardControls() {
         switch(e.key.toLowerCase()) {
             case 's':
                 // Scatter mode - fish disperse in random directions
-                triggerScatter();
+                flock.triggerScatter(3000); // 3 seconds
                 break;
             case 'r':
                 // Reset flock
@@ -165,171 +161,17 @@ function setupKeyboardControls() {
     });
 }
 
-// Initialize individual scatter data
-function initializeIndividualScatter() {
-    individualScatterData = [];
-    for (let i = 0; i < flock.boids.length; i++) {
-        individualScatterData.push({
-            active: false,
-            endTime: 0,
-            vector: null,
-            nextScatterTime: millis() + random(5000, 20000) // Random time between 5-20 seconds
-        });
-    }
-}
-
-// Trigger scatter behavior (all koi)
-function triggerScatter() {
-    scatterMode = true;
-    scatterEndTime = millis() + 3000; // Scatter for 3 seconds
-
-    // Generate random direction vector for each boid
-    scatterVectors = [];
-    for (let i = 0; i < flock.boids.length; i++) {
-        const angle = random(TWO_PI);
-        const speed = random(0.8, 1.5);
-        scatterVectors.push(createVector(cos(angle) * speed, sin(angle) * speed));
-    }
-}
-
-// Update individual scatter behavior
-function updateIndividualScatter() {
-    const currentTime = millis();
-
-    for (let i = 0; i < flock.boids.length; i++) {
-        const data = individualScatterData[i];
-
-        // Check if it's time to trigger a random scatter
-        if (!data.active && currentTime > data.nextScatterTime && !scatterMode) {
-            // Trigger scatter for this individual koi
-            data.active = true;
-            data.endTime = currentTime + random(1000, 2500); // Scatter for 1-2.5 seconds
-
-            const angle = random(TWO_PI);
-            const speed = random(0.8, 1.5);
-            data.vector = createVector(cos(angle) * speed, sin(angle) * speed);
-        }
-
-        // Check if individual scatter should end
-        if (data.active && currentTime > data.endTime + scatterEaseTime) {
-            data.active = false;
-            data.vector = null;
-            // Schedule next scatter in 5-20 seconds
-            data.nextScatterTime = currentTime + random(5000, 20000);
-        }
-    }
-}
-
-// Get scatter intensity for individual boid
-function getIndividualScatterIntensity(index) {
-    const data = individualScatterData[index];
-    if (!data || !data.active) return 0;
-
-    const currentTime = millis();
-
-    if (currentTime < data.endTime) {
-        // Still in scatter phase
-        return 1.0;
-    } else if (currentTime < data.endTime + scatterEaseTime) {
-        // Easing back
-        const elapsed = currentTime - data.endTime;
-        let intensity = 1.0 - (elapsed / scatterEaseTime);
-        // Use easeOut curve
-        return intensity * intensity;
-    }
-
-    return 0;
-}
-
 // p5.js draw function
 window.draw = function() {
     // Get audio data
     const audioData = audio.getAudioData();
 
-    // Draw background (no trail effect - clear each frame)
-    const bgBase = 15 + audioData.bass * 5 * params.audioReactivity;
+    // Draw background - warm paper color for sumi-e aesthetic
     const pg = pixelBuffer.getContext();
-    pg.background(bgBase - 5, bgBase + 5, bgBase);
+    pg.background(242, 240, 235); // Warm paper color (rgb)
 
-    // Update individual scatter behavior
-    updateIndividualScatter();
-
-    // Calculate scatter intensity (1.0 = full scatter, 0.0 = full flock)
-    let scatterIntensity = 0;
-    const currentTime = millis();
-
-    if (currentTime < scatterEndTime) {
-        // Still in scatter phase
-        scatterIntensity = 1.0;
-    } else if (currentTime < scatterEndTime + scatterEaseTime) {
-        // Easing back to flocking
-        const elapsed = currentTime - scatterEndTime;
-        scatterIntensity = 1.0 - (elapsed / scatterEaseTime);
-        // Use easeOut curve for smoother transition
-        scatterIntensity = scatterIntensity * scatterIntensity;
-    } else if (scatterMode) {
-        // Transition complete
-        scatterMode = false;
-        scatterVectors = [];
-    }
-
-    // If scattering, we need to modify behavior before flock update
-    if (scatterIntensity > 0) {
-        // Calculate flocking forces but don't apply them yet
-        // We'll blend them with scatter forces
-        const modifiedParams = {...params};
-
-        // Temporarily modify weights during scatter
-        modifiedParams.separationWeight = params.separationWeight * (1 - scatterIntensity);
-        modifiedParams.alignmentWeight = params.alignmentWeight * (1 - scatterIntensity);
-        modifiedParams.cohesionWeight = params.cohesionWeight * (1 - scatterIntensity);
-
-        flock.update(modifiedParams, audioData);
-
-        // Now add scatter forces on top
-        for (let i = 0; i < flock.boids.length; i++) {
-            const boid = flock.boids[i];
-            const scatterVec = scatterVectors[i];
-
-            // Also check for individual scatter
-            const individualIntensity = getIndividualScatterIntensity(i);
-            const totalIntensity = Math.max(scatterIntensity, individualIntensity);
-            const activeScatterVec = scatterIntensity > individualIntensity ?
-                scatterVec : individualScatterData[i].vector;
-
-            if (activeScatterVec && totalIntensity > 0) {
-                // Create scatter force
-                const scatterForce = activeScatterVec.copy();
-                scatterForce.limit(params.maxForce * 5);
-
-                // Add scatter force weighted by intensity
-                const weightedScatter = scatterForce.copy().mult(totalIntensity);
-                boid.acceleration.add(weightedScatter);
-
-                // Apply velocity changes
-                boid.velocity.add(boid.acceleration);
-
-                // Speed limit blends between normal and fast
-                const maxSpeed = lerp(params.maxSpeed, params.maxSpeed * 1.3, totalIntensity);
-                boid.velocity.limit(maxSpeed);
-
-                // Update position
-                boid.position.add(boid.velocity);
-
-                // Wrap around edges
-                if (boid.position.x > flock.width) boid.position.x = 0;
-                if (boid.position.x < 0) boid.position.x = flock.width;
-                if (boid.position.y > flock.height) boid.position.y = 0;
-                if (boid.position.y < 0) boid.position.y = flock.height;
-
-                // Reset acceleration
-                boid.acceleration.set(0, 0);
-            }
-        }
-    } else {
-        // Normal flocking update
-        flock.update(params, audioData);
-    }
+    // Update flock (scatter is now handled inside each boid)
+    flock.update(params, audioData);
 
     // Render each boid
     for (let boid of flock.boids) {

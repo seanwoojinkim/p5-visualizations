@@ -8,6 +8,44 @@ import { DEFAULT_SHAPE_PARAMS } from './koi-params.js';
 
 export class KoiRenderer {
     /**
+     * Create a new koi renderer
+     * @param {BrushTextures} brushTextures - Brush textures for sumi-e rendering (optional)
+     */
+    constructor(brushTextures = null) {
+        this.brushTextures = brushTextures;
+        this.useSumieStyle = brushTextures !== null && brushTextures.isReady;
+    }
+
+    /**
+     * Apply brush texture overlay to enhance sumi-e aesthetic
+     * @param {Object} context - p5 graphics context
+     * @param {string} textureName - Name of texture to use (body, fin, tail, spot)
+     * @param {number} x - X position
+     * @param {number} y - Y position
+     * @param {number} width - Width to scale texture
+     * @param {number} height - Height to scale texture
+     * @param {number} rotation - Rotation angle in radians (default: 0)
+     */
+    applyBrushTexture(context, textureName, x, y, width, height, rotation = 0) {
+        if (!this.useSumieStyle) return;
+
+        const texture = this.brushTextures.get(textureName);
+        if (!texture) return;
+
+        context.push();
+        context.translate(x, y);
+        if (rotation !== 0) context.rotate(rotation);
+
+        // Use MULTIPLY blend mode for ink effect
+        // Dark values in texture darken the underlying color, white stays transparent
+        context.blendMode(context.MULTIPLY);
+        context.image(texture, -width/2, -height/2, width, height);
+        context.blendMode(context.BLEND); // Reset to normal blending
+
+        context.pop();
+    }
+
+    /**
      * Render a koi fish to the given graphics context
      * @param {Object} context - p5 graphics context (can be main canvas or graphics buffer)
      * @param {number} x - X position
@@ -214,6 +252,15 @@ export class KoiRenderer {
         context.curveVertex(bottomPoints[0].x, bottomPoints[0].y);
 
         context.endShape(context.CLOSE);
+
+        // Apply brush texture overlay for flowing tail effect
+        if (this.useSumieStyle) {
+            const tailCenterX = (topPoints[3].x + bottomPoints[3].x) / 2;
+            const tailCenterY = (topPoints[3].y + bottomPoints[3].y) / 2;
+            const tailWidth = tailLengthScaled * 1.2;
+            const tailHeight = shapeParams.tailWidthStart * sizeScale * 3;
+            this.applyBrushTexture(context, 'tail', tailCenterX, tailCenterY, tailWidth, tailHeight);
+        }
     }
 
     /**
@@ -266,6 +313,18 @@ export class KoiRenderer {
             context.line(seg.x, topY, seg.x, bottomY);
         }
         context.noStroke();
+
+        // Apply brush texture overlay for sumi-e aesthetic
+        if (this.useSumieStyle) {
+            // Apply texture to middle segments of body
+            const bodyLength = segmentPositions.length;
+            for (let i = 2; i < bodyLength - 2; i++) {
+                const seg = segmentPositions[i];
+                const textureWidth = seg.w * 2;
+                const textureHeight = seg.w * 1.5;
+                this.applyBrushTexture(context, 'body', seg.x, seg.y, textureWidth, textureHeight);
+            }
+        }
     }
 
     /**
@@ -281,6 +340,12 @@ export class KoiRenderer {
             const spotW = spot.size * sizeScale;
             const spotH = spot.size * sizeScale * 0.8;
             context.ellipse(seg.x, seg.y + spot.offsetY * sizeScale, spotW, spotH);
+
+            // Apply brush texture to each spot for organic edges
+            if (this.useSumieStyle) {
+                const textureSize = spot.size * sizeScale * 1.3;
+                this.applyBrushTexture(context, 'spot', seg.x, seg.y + spot.offsetY * sizeScale, textureSize, textureSize);
+            }
         }
     }
 

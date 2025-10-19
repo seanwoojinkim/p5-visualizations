@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sumi-e Brush Texture Generator</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            background: #1a1a1a;
+            color: #e0e0e0;
+            font-family: 'Courier New', monospace;
+        }
+        h1 {
+            color: #6ac0ff;
+        }
+        .controls {
+            margin: 20px 0;
+            padding: 20px;
+            background: rgba(40, 40, 50, 0.9);
+            border-radius: 4px;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            background: #2a2a35;
+            border: 1px solid #404050;
+            color: #e0e0e0;
+            cursor: pointer;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+        }
+        button:hover {
+            background: #353545;
+        }
+        canvas {
+            border: 2px solid #404050;
+            margin: 10px;
+        }
+        .texture-preview {
+            display: inline-block;
+            margin: 10px;
+        }
+        .texture-label {
+            text-align: center;
+            color: #6ac0ff;
+            font-size: 12px;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🖌️ Sumi-e Brush Texture Generator</h1>
+
+    <div class="controls">
+        <p>Click buttons to generate and download textures for the koi simulation:</p>
+        <button onclick="generateBodyBrush()">Generate Body Brush (512×256)</button>
+        <button onclick="generateFinBrush()">Generate Fin Brush (256×128)</button>
+        <button onclick="generateTailBrush()">Generate Tail Brush (512×128)</button>
+        <button onclick="generateSpotBrush()">Generate Spot Brush (256×256)</button>
+        <button onclick="generatePaperGrain()">Generate Paper Grain (1024×1024)</button>
+    </div>
+
+    <div id="previews"></div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.7.0/p5.min.js"></script>
+    <script>
+        // Procedural brush texture generation using p5.js
+
+        function generateBodyBrush() {
+            const pg = createGraphics(512, 256);
+            pg.background(255);
+            pg.noStroke();
+
+            // Create flowing horizontal brush strokes with fiber texture
+            for (let i = 0; i < 800; i++) {
+                const x = random(0, 512);
+                const y = random(0, 256);
+                const len = random(20, 80);
+                const thickness = random(1, 4);
+                const alpha = random(30, 150);
+
+                pg.fill(0, alpha);
+                pg.ellipse(x, y, len, thickness);
+            }
+
+            // Add fiber detail
+            for (let i = 0; i < 1500; i++) {
+                const x = random(0, 512);
+                const y = random(0, 256);
+                const alpha = random(10, 60);
+                pg.fill(0, alpha);
+                pg.ellipse(x, y, random(1, 3), random(0.5, 2));
+            }
+
+            // Add noise for organic texture
+            pg.loadPixels();
+            for (let i = 0; i < pg.pixels.length; i += 4) {
+                const noise = random(-15, 15);
+                pg.pixels[i] = constrain(pg.pixels[i] + noise, 0, 255);
+                pg.pixels[i + 1] = constrain(pg.pixels[i + 1] + noise, 0, 255);
+                pg.pixels[i + 2] = constrain(pg.pixels[i + 2] + noise, 0, 255);
+            }
+            pg.updatePixels();
+
+            downloadTexture(pg, 'brush-body.png');
+            showPreview(pg, 'Body Brush');
+        }
+
+        function generateFinBrush() {
+            const pg = createGraphics(256, 128);
+            pg.background(255);
+            pg.noStroke();
+
+            // Delicate, wispy strokes for fins
+            for (let i = 0; i < 300; i++) {
+                const x = random(0, 256);
+                const y = random(0, 128);
+                const len = random(10, 40);
+                const thickness = random(0.5, 2);
+                const alpha = random(20, 100);
+
+                pg.fill(0, alpha);
+                pg.ellipse(x, y, len, thickness);
+            }
+
+            // Subtle fiber detail
+            for (let i = 0; i < 500; i++) {
+                const x = random(0, 256);
+                const y = random(0, 128);
+                const alpha = random(5, 40);
+                pg.fill(0, alpha);
+                pg.ellipse(x, y, random(1, 2), random(0.3, 1));
+            }
+
+            downloadTexture(pg, 'brush-fin.png');
+            showPreview(pg, 'Fin Brush');
+        }
+
+        function generateTailBrush() {
+            const pg = createGraphics(512, 128);
+            pg.background(255);
+            pg.noStroke();
+
+            // Flowing, dynamic strokes for tail
+            for (let i = 0; i < 600; i++) {
+                const x = random(0, 512);
+                const y = random(0, 128);
+                const len = random(30, 120);
+                const thickness = random(1, 5);
+                const alpha = random(25, 140);
+
+                pg.fill(0, alpha);
+                pg.ellipse(x, y, len, thickness);
+            }
+
+            // Add flowing detail
+            for (let i = 0; i < 1000; i++) {
+                const x = random(0, 512);
+                const y = random(0, 128);
+                const alpha = random(10, 50);
+                pg.fill(0, alpha);
+                pg.ellipse(x, y, random(2, 5), random(0.5, 2));
+            }
+
+            downloadTexture(pg, 'brush-tail.png');
+            showPreview(pg, 'Tail Brush');
+        }
+
+        function generateSpotBrush() {
+            const pg = createGraphics(256, 256);
+            pg.background(255);
+            pg.noStroke();
+
+            // Organic spot texture with soft edges
+            const centerX = 128;
+            const centerY = 128;
+
+            for (let i = 0; i < 500; i++) {
+                const angle = random(TWO_PI);
+                const radius = random(0, 80);
+                const x = centerX + cos(angle) * radius;
+                const y = centerY + sin(angle) * radius;
+                const size = random(3, 15);
+                const alpha = random(40, 150) * (1 - radius / 80);
+
+                pg.fill(0, alpha);
+                pg.ellipse(x, y, size, size);
+            }
+
+            downloadTexture(pg, 'brush-spot.png');
+            showPreview(pg, 'Spot Brush');
+        }
+
+        function generatePaperGrain() {
+            const pg = createGraphics(1024, 1024);
+            pg.background(255);
+            pg.noStroke();
+
+            // Fine paper grain texture
+            for (let i = 0; i < 8000; i++) {
+                const x = random(0, 1024);
+                const y = random(0, 1024);
+                const size = random(0.5, 2);
+                const alpha = random(5, 25);
+
+                pg.fill(0, alpha);
+                pg.ellipse(x, y, size, size);
+            }
+
+            // Add subtle fiber patterns
+            for (let i = 0; i < 2000; i++) {
+                const x = random(0, 1024);
+                const y = random(0, 1024);
+                const len = random(2, 8);
+                const alpha = random(3, 15);
+
+                pg.fill(0, alpha);
+                pg.ellipse(x, y, len, 1);
+            }
+
+            // Gentle noise
+            pg.loadPixels();
+            for (let i = 0; i < pg.pixels.length; i += 4) {
+                const noise = random(-8, 8);
+                pg.pixels[i] = constrain(pg.pixels[i] + noise, 0, 255);
+                pg.pixels[i + 1] = constrain(pg.pixels[i + 1] + noise, 0, 255);
+                pg.pixels[i + 2] = constrain(pg.pixels[i + 2] + noise, 0, 255);
+            }
+            pg.updatePixels();
+
+            downloadTexture(pg, 'paper-grain.png');
+            showPreview(pg, 'Paper Grain (scaled down)');
+        }
+
+        function downloadTexture(pg, filename) {
+            pg.save(filename);
+        }
+
+        function showPreview(pg, label) {
+            const previewDiv = document.getElementById('previews');
+            const container = document.createElement('div');
+            container.className = 'texture-preview';
+
+            const canvas = pg.canvas.cloneNode(true);
+            // Scale down large previews
+            if (pg.width > 512) {
+                canvas.style.width = '512px';
+                canvas.style.height = (512 * pg.height / pg.width) + 'px';
+            }
+
+            const labelDiv = document.createElement('div');
+            labelDiv.className = 'texture-label';
+            labelDiv.textContent = label;
+
+            container.appendChild(canvas);
+            container.appendChild(labelDiv);
+            previewDiv.appendChild(container);
+        }
+
+        // p5.js setup - we don't need a visible canvas
+        function setup() {
+            noCanvas();
+        }
+    </script>
+</body>
+</html>
