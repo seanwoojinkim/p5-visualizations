@@ -4,6 +4,8 @@
  * Extracted from sketch.js Boid class methods
  */
 
+import { PHYSICS_CONFIG } from './physics-config.js';
+
 /**
  * Find neighbors within perception radius
  * @param {Object} boid - The boid to find neighbors for
@@ -27,11 +29,10 @@ export function findNeighbors(boid, flock, perceptionRadius) {
         }
     }
 
-    // Sort by distance and limit to closest 8 neighbors
+    // Sort by distance and limit to closest N neighbors
     // This prevents oscillation from too many conflicting forces
     neighborsWithDistance.sort((a, b) => a.distance - b.distance);
-    const maxNeighbors = 8;
-    const closestNeighbors = neighborsWithDistance.slice(0, maxNeighbors);
+    const closestNeighbors = neighborsWithDistance.slice(0, PHYSICS_CONFIG.MAX_NEIGHBORS);
 
     return closestNeighbors.map(n => n.boid);
 }

@@ -19,6 +19,7 @@ let pixelBuffer;
 let renderer;
 let controlPanel;
 let brushTextures;
+let backgroundImage;
 
 // Detect mobile/small screens and adjust defaults for performance
 const isMobile = window.innerWidth < 768 || /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
@@ -46,6 +47,11 @@ console.log(`   Optimized defaults: ${params.numBoids} koi, pixel scale ${params
 
 // Debug mode
 let debugVectors = false;
+
+// p5.js preload function (loads assets before setup)
+window.preload = function() {
+    backgroundImage = loadImage('assets/water-background.png');
+};
 
 // p5.js setup function
 window.setup = function() {
@@ -166,9 +172,16 @@ window.draw = function() {
     // Get audio data
     const audioData = audio.getAudioData();
 
-    // Draw background - warm paper color for sumi-e aesthetic
+    // Draw background - watercolor texture
     const pg = pixelBuffer.getContext();
-    pg.background(242, 240, 235); // Warm paper color (rgb)
+
+    // Draw the background image to fill the buffer
+    if (backgroundImage) {
+        pg.image(backgroundImage, 0, 0, pg.width, pg.height);
+    } else {
+        // Fallback to solid color if image isn't loaded
+        pg.background(242, 240, 235);
+    }
 
     // Update flock (scatter is now handled inside each boid)
     flock.update(params, audioData);

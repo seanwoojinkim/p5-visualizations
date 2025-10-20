@@ -40,6 +40,9 @@ export class FlockManager {
      * @param {Object} audioData - Audio data for reactivity
      */
     update(params, audioData) {
+        // Check if global scatter is active (more than half the flock scattering)
+        const globalScatterActive = this.isAnyBoidScattering();
+
         for (let boid of this.boids) {
             // Check if this boid is escaping oscillation
             const isEscaping = boid.getIsEscaping();
@@ -69,19 +72,28 @@ export class FlockManager {
                     // Normal flocking behavior
                     const neighbors = findNeighbors(boid, this.boids, boid.perceptionRadius);
                     const forces = this.calculateFlockingForces(boid, neighbors, params, audioData);
-                    boid.applyForces(forces, neighbors.length, this.p5Funcs.random);
+                    boid.applyForces(forces, neighbors.length, this.p5Funcs.random, params.maxForce, this.p5);
                 }
                 // If independent, don't apply flocking forces - they just drift
             }
 
-            // Update physics (includes independence and escape state updates)
-            boid.update(params.maxSpeed, audioData.amplitude, params.audioReactivity, this.p5, this.p5Funcs.random);
+            // Update physics (includes independence, escape, and scatter state updates)
+            boid.update(
+                params.maxSpeed,
+                audioData.amplitude,
+                params.audioReactivity,
+                this.p5,
+                this.p5Funcs.random,
+                this.p5Funcs.createVector,
+                globalScatterActive
+            );
             boid.edges(this.width, this.height);
         }
     }
 
     /**
-     * Calculate combined flocking forces with smoothing
+     * Calculate combined flocking forces
+     * Forces are smoothed in Boid.applyForces() to avoid double-smoothing
      * @param {Object} boid - The boid
      * @param {Array} neighbors - Neighboring boids
      * @param {Object} params - Flocking parameters
@@ -118,41 +130,18 @@ export class FlockManager {
             this.p5
         );
 
-        // Smooth the forces by blending with previous frame
-        const forceSmoothness = 0.3;  // Lower = smoother, higher = more responsive
-        const smoothedAlignment = this.p5.Vector.lerp(
-            boid.previousAlignment.copy(),
-            alignment,
-            forceSmoothness
-        );
-        const smoothedCohesion = this.p5.Vector.lerp(
-            boid.previousCohesion.copy(),
-            cohesion,
-            forceSmoothness
-        );
-        const smoothedSeparation = this.p5.Vector.lerp(
-            boid.previousSeparation.copy(),
-            separation,
-            forceSmoothness
-        );
-
-        // Store smoothed forces for next frame
-        boid.previousAlignment = smoothedAlignment.copy();
-        boid.previousCohesion = smoothedCohesion.copy();
-        boid.previousSeparation = smoothedSeparation.copy();
-
-        // Weight the forces
-        smoothedAlignment.mult(params.alignmentWeight);
-        smoothedCohesion.mult(params.cohesionWeight);
+        // Weight the forces (smoothing happens in Boid.applyForces)
+        alignment.mult(params.alignmentWeight);
+        cohesion.mult(params.cohesionWeight);
 
         // Bass makes them separate more - push away on bass hits (gentle)
         const bassBoost = 1 + audioData.bass * 1.5 * params.audioReactivity;
-        smoothedSeparation.mult(params.separationWeight * bassBoost);
+        separation.mult(params.separationWeight * bassBoost);
 
         return {
-            alignment: smoothedAlignment,
-            cohesion: smoothedCohesion,
-            separation: smoothedSeparation
+            alignment,
+            cohesion,
+            separation
         };
     }
 
@@ -195,5 +184,31 @@ export class FlockManager {
                 this.p5
             ));
         }
+    }
+
+    /**
+     * Trigger global scatter - all boids scatter in random directions
+     * @param {number} duration - How long to scatter (milliseconds)
+     */
+    triggerScatter(duration = 3000) {
+        for (let boid of this.boids) {
+            // Generate random direction for each boid
+            const angle = this.p5Funcs.random(0, Math.PI * 2);
+            const speed = this.p5Funcs.random(0.8, 1.5);
+            const direction = this.p5Funcs.createVector(
+                Math.cos(angle) * speed,
+                Math.sin(angle) * speed
+            );
+
+            boid.triggerScatter(duration, direction);
+        }
+    }
+
+    /**
+     * Check if any boids are currently scattering (for global scatter detection)
+     * @returns {boolean}
+     */
+    isAnyBoidScattering() {
+        return this.boids.some(boid => boid.getScatterIntensity() > 0.5);
     }
 }

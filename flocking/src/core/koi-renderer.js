@@ -165,57 +165,86 @@ export class KoiRenderer {
      */
     drawFins(context, segmentPositions, shapeParams, waveTime, sizeScale, hue, saturation, brightness) {
         const finSway = Math.sin(waveTime - 0.5) * 0.8;
-        context.fill(hue, saturation + 8, brightness - 15, 0.7);
+        const finOpacity = this.useSumieStyle ? 0.6 : 0.7;
+        const layers = this.useSumieStyle ? 2 : 1; // Lighter layering for fins
 
         // Pectoral fins (left and right)
         const finPos = segmentPositions[shapeParams.pectoralPos];
 
         // Top pectoral fin (left)
-        context.push();
-        context.translate(finPos.x, finPos.y + shapeParams.pectoralYTop * sizeScale + finSway);
-        context.rotate(shapeParams.pectoralAngleTop + Math.sin(waveTime * 1.2) * 0.15);
-        context.ellipse(2.25 * sizeScale, 0, 4.5 * sizeScale, 2 * sizeScale);
-        context.pop();
+        for (let layer = 0; layer < layers; layer++) {
+            const offset = this.useSumieStyle ? (layer - 0.5) * 0.2 : 0;
+            const opacity = this.useSumieStyle ? (layer === 0 ? 0.5 : 0.25) : finOpacity;
+
+            context.fill(hue, saturation + 8, brightness - 15, opacity);
+            context.push();
+            context.translate(finPos.x, finPos.y + shapeParams.pectoralYTop * sizeScale + finSway);
+            context.rotate(shapeParams.pectoralAngleTop + Math.sin(waveTime * 1.2) * 0.15);
+            context.ellipse(2.25 * sizeScale + offset, 0, 4.5 * sizeScale, 2 * sizeScale);
+            context.pop();
+        }
 
         // Bottom pectoral fin (right)
-        context.push();
-        context.translate(finPos.x, finPos.y + shapeParams.pectoralYBottom * sizeScale - finSway);
-        context.rotate(shapeParams.pectoralAngleBottom - Math.sin(waveTime * 1.2) * 0.15);
-        context.ellipse(2.25 * sizeScale, 0, 4.5 * sizeScale, 2 * sizeScale);
-        context.pop();
+        for (let layer = 0; layer < layers; layer++) {
+            const offset = this.useSumieStyle ? (layer - 0.5) * 0.2 : 0;
+            const opacity = this.useSumieStyle ? (layer === 0 ? 0.5 : 0.25) : finOpacity;
+
+            context.fill(hue, saturation + 8, brightness - 15, opacity);
+            context.push();
+            context.translate(finPos.x, finPos.y + shapeParams.pectoralYBottom * sizeScale - finSway);
+            context.rotate(shapeParams.pectoralAngleBottom - Math.sin(waveTime * 1.2) * 0.15);
+            context.ellipse(2.25 * sizeScale + offset, 0, 4.5 * sizeScale, 2 * sizeScale);
+            context.pop();
+        }
 
         // Dorsal fin
         const dorsalPos = segmentPositions[shapeParams.dorsalPos];
-        context.fill(hue, saturation + 8, brightness - 15, 0.75);
-        context.push();
-        context.translate(dorsalPos.x, dorsalPos.y + shapeParams.dorsalY * sizeScale);
-        context.rotate(-0.2);
-        context.beginShape();
-        context.vertex(0, 0);
-        context.vertex(-1 * sizeScale, -2 * sizeScale);
-        context.vertex(1 * sizeScale, -2.5 * sizeScale);
-        context.vertex(2 * sizeScale, -1.5 * sizeScale);
-        context.vertex(2 * sizeScale, 0);
-        context.endShape(context.CLOSE);
-        context.pop();
+        for (let layer = 0; layer < layers; layer++) {
+            const offset = this.useSumieStyle ? (layer - 0.5) * 0.15 : 0;
+            const opacity = this.useSumieStyle ? (layer === 0 ? 0.6 : 0.3) : 0.75;
+
+            context.fill(hue, saturation + 8, brightness - 15, opacity);
+            context.push();
+            context.translate(dorsalPos.x, dorsalPos.y + shapeParams.dorsalY * sizeScale);
+            context.rotate(-0.2);
+            context.beginShape();
+            context.vertex(0, offset);
+            context.vertex(-1 * sizeScale, -2 * sizeScale + offset);
+            context.vertex(1 * sizeScale, -2.5 * sizeScale + offset);
+            context.vertex(2 * sizeScale, -1.5 * sizeScale + offset);
+            context.vertex(2 * sizeScale, offset);
+            context.endShape(context.CLOSE);
+            context.pop();
+        }
 
         // Ventral fins (top and bottom)
         const ventralPos = segmentPositions[shapeParams.ventralPos];
-        context.fill(hue, saturation + 8, brightness - 15, 0.7);
 
         // Top ventral fin
-        context.push();
-        context.translate(ventralPos.x, ventralPos.y + shapeParams.ventralYTop * sizeScale);
-        context.rotate(shapeParams.ventralAngleTop + Math.sin(waveTime * 1.2) * 0.1);
-        context.ellipse(1.5 * sizeScale, 0, 3 * sizeScale, 1.5 * sizeScale);
-        context.pop();
+        for (let layer = 0; layer < layers; layer++) {
+            const offset = this.useSumieStyle ? (layer - 0.5) * 0.2 : 0;
+            const opacity = this.useSumieStyle ? (layer === 0 ? 0.5 : 0.25) : finOpacity;
+
+            context.fill(hue, saturation + 8, brightness - 15, opacity);
+            context.push();
+            context.translate(ventralPos.x, ventralPos.y + shapeParams.ventralYTop * sizeScale);
+            context.rotate(shapeParams.ventralAngleTop + Math.sin(waveTime * 1.2) * 0.1);
+            context.ellipse(1.5 * sizeScale + offset, 0, 3 * sizeScale, 1.5 * sizeScale);
+            context.pop();
+        }
 
         // Bottom ventral fin
-        context.push();
-        context.translate(ventralPos.x, ventralPos.y + shapeParams.ventralYBottom * sizeScale);
-        context.rotate(shapeParams.ventralAngleBottom - Math.sin(waveTime * 1.2) * 0.1);
-        context.ellipse(1.5 * sizeScale, 0, 3 * sizeScale, 1.5 * sizeScale);
-        context.pop();
+        for (let layer = 0; layer < layers; layer++) {
+            const offset = this.useSumieStyle ? (layer - 0.5) * 0.2 : 0;
+            const opacity = this.useSumieStyle ? (layer === 0 ? 0.5 : 0.25) : finOpacity;
+
+            context.fill(hue, saturation + 8, brightness - 15, opacity);
+            context.push();
+            context.translate(ventralPos.x, ventralPos.y + shapeParams.ventralYBottom * sizeScale);
+            context.rotate(shapeParams.ventralAngleBottom - Math.sin(waveTime * 1.2) * 0.1);
+            context.ellipse(1.5 * sizeScale + offset, 0, 3 * sizeScale, 1.5 * sizeScale);
+            context.pop();
+        }
     }
 
     /**
@@ -226,9 +255,6 @@ export class KoiRenderer {
         const tailStartX = tailBase.x + shapeParams.tailStartX * sizeScale;
         const tailSegments = 6;
         const tailLengthScaled = tailLength * 6 * sizeScale;
-
-        context.fill(hue, saturation + 5, brightness - 12, 0.8);
-        context.beginShape();
 
         // Calculate tail points
         const topPoints = [];
@@ -244,7 +270,34 @@ export class KoiRenderer {
             bottomPoints.push({ x, y: tailBase.y + width + tailSway });
         }
 
-        // Draw tail shape with curve vertices
+        // For sumi-e style, draw multiple layers for soft edges
+        if (this.useSumieStyle) {
+            for (let layer = 0; layer < 3; layer++) {
+                const offset = (layer - 1) * 0.4;
+                const opacity = layer === 1 ? 0.7 : 0.25;
+
+                context.fill(hue, saturation + 5, brightness - 12, opacity);
+                context.beginShape();
+
+                // Draw tail shape with curve vertices and offset
+                context.curveVertex(topPoints[0].x, topPoints[0].y + offset);
+                for (let pt of topPoints) {
+                    context.curveVertex(pt.x, pt.y + offset);
+                }
+                for (let i = bottomPoints.length - 1; i >= 0; i--) {
+                    context.curveVertex(bottomPoints[i].x, bottomPoints[i].y + offset);
+                }
+                context.curveVertex(bottomPoints[0].x, bottomPoints[0].y + offset);
+
+                context.endShape(context.CLOSE);
+            }
+            return;
+        }
+
+        // Normal rendering (non-sumi-e)
+        context.fill(hue, saturation + 5, brightness - 12, 0.8);
+        context.beginShape();
+
         context.curveVertex(topPoints[0].x, topPoints[0].y);
         for (let pt of topPoints) {
             context.curveVertex(pt.x, pt.y);
@@ -255,21 +308,55 @@ export class KoiRenderer {
         context.curveVertex(bottomPoints[0].x, bottomPoints[0].y);
 
         context.endShape(context.CLOSE);
-
-        // Apply brush texture overlay for flowing tail effect - subtle
-        if (this.useSumieStyle) {
-            const tailCenterX = (topPoints[3].x + bottomPoints[3].x) / 2;
-            const tailCenterY = (topPoints[3].y + bottomPoints[3].y) / 2;
-            const tailWidth = tailLengthScaled * 1.0;
-            const tailHeight = shapeParams.tailWidthStart * sizeScale * 2.5;
-            this.applyBrushTexture(context, 'tail', tailCenterX, tailCenterY, tailWidth, tailHeight, 0, 0.25);
-        }
     }
 
     /**
      * Draw main body outline
      */
     drawBody(context, segmentPositions, shapeParams, sizeScale, hue, saturation, brightness) {
+        // For sumi-e style, draw multiple semi-transparent layers with slight variations
+        // This creates soft, organic brush-like edges
+        if (this.useSumieStyle) {
+            // Draw 3 layers with slight variations for soft edges
+            for (let layer = 0; layer < 3; layer++) {
+                const offset = (layer - 1) * 0.3; // Slight positional variation
+                const opacity = layer === 1 ? 0.7 : 0.3; // Middle layer darker
+
+                context.fill(hue, saturation, brightness - 2, opacity);
+                context.beginShape();
+
+                const headSeg = segmentPositions[0];
+                const headPt = { x: headSeg.x + shapeParams.headX * sizeScale, y: headSeg.y };
+
+                context.curveVertex(headPt.x, headPt.y + offset);
+                context.curveVertex(headPt.x, headPt.y + offset);
+
+                const asymmetry = shapeParams.bodyAsymmetry || 0;
+
+                for (let i = 0; i < segmentPositions.length; i++) {
+                    const seg = segmentPositions[i];
+                    const topMultiplier = 0.48 * (1 - asymmetry * 0.15);
+                    context.curveVertex(seg.x, seg.y - seg.w * topMultiplier + offset);
+                }
+
+                for (let i = segmentPositions.length - 1; i >= 0; i--) {
+                    const seg = segmentPositions[i];
+                    const bottomMultiplier = 0.48 * (1 + asymmetry * 0.15);
+                    context.curveVertex(seg.x, seg.y + seg.w * bottomMultiplier + offset);
+                }
+
+                context.curveVertex(headPt.x, headPt.y + offset);
+                context.curveVertex(headPt.x, headPt.y + offset);
+
+                context.endShape(context.CLOSE);
+            }
+
+            // Skip segment lines for sumi-e style (too precise)
+            context.noStroke();
+            return; // Exit early, don't draw the normal body
+        }
+
+        // Normal rendering (non-sumi-e)
         context.fill(hue, saturation, brightness - 2, 0.92);
         context.beginShape();
 
@@ -316,19 +403,6 @@ export class KoiRenderer {
             context.line(seg.x, topY, seg.x, bottomY);
         }
         context.noStroke();
-
-        // Apply brush texture overlay for sumi-e aesthetic - very subtle
-        if (this.useSumieStyle) {
-            // Apply texture only to a few segments to avoid over-darkening
-            const bodyLength = segmentPositions.length;
-            // Only apply to every other segment, and skip head/tail areas
-            for (let i = 3; i < bodyLength - 3; i += 2) {
-                const seg = segmentPositions[i];
-                const textureWidth = seg.w * 2.5;
-                const textureHeight = seg.w * 2;
-                this.applyBrushTexture(context, 'body', seg.x, seg.y, textureWidth, textureHeight, 0, 0.2);
-            }
-        }
     }
 
     /**
@@ -339,16 +413,30 @@ export class KoiRenderer {
             if (spot.segment >= segmentPositions.length) continue;
 
             const seg = segmentPositions[spot.segment];
-            context.fill(spot.color.h, spot.color.s, spot.color.b, 0.85);
-
             const spotW = spot.size * sizeScale;
             const spotH = spot.size * sizeScale * 0.8;
-            context.ellipse(seg.x, seg.y + spot.offsetY * sizeScale, spotW, spotH);
+            const spotX = seg.x;
+            const spotY = seg.y + spot.offsetY * sizeScale;
 
-            // Apply brush texture to each spot for organic edges - very subtle
+            // For sumi-e style, draw multiple layers for soft, organic spot edges
             if (this.useSumieStyle) {
-                const textureSize = spot.size * sizeScale * 1.1;
-                this.applyBrushTexture(context, 'spot', seg.x, seg.y + spot.offsetY * sizeScale, textureSize, textureSize, 0, 0.15);
+                for (let layer = 0; layer < 3; layer++) {
+                    const offset = (layer - 1) * 0.2;
+                    const sizeVariation = 1 + (layer - 1) * 0.1; // Slight size variation
+                    const opacity = layer === 1 ? 0.75 : 0.3;
+
+                    context.fill(spot.color.h, spot.color.s, spot.color.b, opacity);
+                    context.ellipse(
+                        spotX + offset,
+                        spotY + offset,
+                        spotW * sizeVariation,
+                        spotH * sizeVariation
+                    );
+                }
+            } else {
+                // Normal rendering
+                context.fill(spot.color.h, spot.color.s, spot.color.b, 0.85);
+                context.ellipse(spotX, spotY, spotW, spotH);
             }
         }
     }
@@ -357,16 +445,33 @@ export class KoiRenderer {
      * Draw head and eyes
      */
     drawHead(context, headSegment, shapeParams, sizeScale, hue, saturation, brightness) {
-        // Head ellipse
-        context.fill(hue, saturation, brightness + 2, 0.92);
-        context.ellipse(
-            headSegment.x + shapeParams.headX * sizeScale,
-            headSegment.y,
-            shapeParams.headWidth * sizeScale,
-            shapeParams.headHeight * sizeScale
-        );
+        const headX = headSegment.x + shapeParams.headX * sizeScale;
+        const headY = headSegment.y;
+        const headWidth = shapeParams.headWidth * sizeScale;
+        const headHeight = shapeParams.headHeight * sizeScale;
 
-        // Eyes (both sides for top-down view)
+        // For sumi-e style, draw head with multiple layers for soft edges
+        if (this.useSumieStyle) {
+            for (let layer = 0; layer < 3; layer++) {
+                const offset = (layer - 1) * 0.25;
+                const sizeVariation = 1 + (layer - 1) * 0.08;
+                const opacity = layer === 1 ? 0.8 : 0.3;
+
+                context.fill(hue, saturation, brightness + 2, opacity);
+                context.ellipse(
+                    headX + offset,
+                    headY + offset,
+                    headWidth * sizeVariation,
+                    headHeight * sizeVariation
+                );
+            }
+        } else {
+            // Normal rendering
+            context.fill(hue, saturation, brightness + 2, 0.92);
+            context.ellipse(headX, headY, headWidth, headHeight);
+        }
+
+        // Eyes (both sides for top-down view) - always solid, no layering
         context.fill(0, 0, 10, 0.8);
 
         // Left eye (top)
