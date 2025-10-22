@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Koi Dorsal Fin Template
+     Dimensions: 20 × 25 units (width × height)
+     Anchor: Base center
+     5-vertex polygon
+
+     Instructions:
+     - Edit to create triangular dorsal fin shape
+     - Peak should be highest point
+     - Can add more detail/curves than template
+     - Traditional koi fin is slightly backward-swept
+-->
+<svg width="20" height="25" viewBox="0 0 20 25" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <style>
+      .guide { fill: none; stroke: #ccc; stroke-width: 0.5; stroke-dasharray: 2,2; }
+      .fin-path { fill: #ffffff; stroke: #000; stroke-width: 1; }
+    </style>
+  </defs>
+
+  <!-- Guide lines -->
+  <line x1="10" y1="0" x2="10" y2="25" class="guide"/> <!-- Centerline -->
+
+  <!-- Dorsal fin path - EDIT THIS -->
+  <path class="fin-path" d="
+    M 10,25
+    L 5,8
+    L 12,2
+    L 18,10
+    L 18,25
+    Z
+  "/>
+</svg>

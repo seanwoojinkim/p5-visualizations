@@ -72,8 +72,8 @@ export const PHYSICS_CONFIG = {
     SCATTER_SPEED_BOOST: 0.3,           // Speed increase during scatter (30%)
     SCATTER_INDIVIDUAL_MIN: 1000,       // Min individual scatter duration (ms)
     SCATTER_INDIVIDUAL_MAX: 2500,       // Max individual scatter duration (ms)
-    SCATTER_NEXT_MIN: 5000,             // Min time until next random scatter (ms)
-    SCATTER_NEXT_MAX: 20000,            // Max time until next random scatter (ms)
+    SCATTER_NEXT_MIN: 20000,             // Min time until next random scatter (ms)
+    SCATTER_NEXT_MAX: 60000,            // Max time until next random scatter (ms)
     SCATTER_SPEED_MIN: 0.8,             // Min scatter speed multiplier
     SCATTER_SPEED_MAX: 1.5,             // Max scatter speed multiplier
 

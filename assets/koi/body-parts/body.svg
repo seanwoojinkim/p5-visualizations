@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Koi Body Outline Template
+     Dimensions: 16 × 8 units (width × height at peak)
+     Anchor: Center of head (front of path)
+     ~20 control points for smooth deformation
+
+     Instructions:
+     - Edit this path in Illustrator to create organic koi body shape
+     - Keep approximately 20-24 anchor points for wave deformation
+     - Front (left) should be narrower (~4.5 units tall)
+     - Peak width (~8 units) should be at ~70% along length
+     - Belly (bottom) should be rounder than back (top)
+     - Taper toward tail (right side)
+-->
+<svg width="160" height="80" viewBox="0 0 160 80" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <style>
+      .guide { fill: none; stroke: #ccc; stroke-width: 0.5; stroke-dasharray: 2,2; }
+      .body-path { fill: #ffffff; stroke: #000; stroke-width: 1; }
+    </style>
+  </defs>
+
+  <!-- Guide lines (remove when authoring) -->
+  <line x1="0" y1="40" x2="160" y2="40" class="guide"/> <!-- Centerline -->
+  <line x1="112" y1="0" x2="112" y2="80" class="guide"/> <!-- Peak position (70%) -->
+
+  <!-- Main body path - EDIT THIS -->
+  <path class="body-path" d="
+    M 10,40
+    C 20,30 30,25 40,23
+    C 50,22 60,21 70,20
+    C 80,20 90,20 100,22
+    C 110,24 118,30 120,40
+    C 118,50 110,56 100,58
+    C 90,60 80,60 70,60
+    C 60,59 50,58 40,57
+    C 30,55 20,50 10,40
+    Z
+  "/>
+</svg>

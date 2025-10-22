@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Segment Guide Template
+     Shows the 10 body segments and their widths
+     Use this as a reference when authoring body.svg
+
+     Segment layout:
+     - Segment 0: Head (front)
+     - Segments 1-6: Body front to mid
+     - Segment 7: Peak width position (~70%)
+     - Segments 8-9: Body back (taper zone)
+-->
+<svg width="180" height="100" viewBox="-10 -10 180 100" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <style>
+      .segment { fill: none; stroke: #00f; stroke-width: 0.5; }
+      .segment-line { stroke: #f00; stroke-width: 0.3; stroke-dasharray: 1,1; }
+      .label { font-family: monospace; font-size: 6px; fill: #333; }
+      .centerline { stroke: #0f0; stroke-width: 0.3; stroke-dasharray: 2,2; }
+      .peak-marker { stroke: #ff6600; stroke-width: 1; }
+    </style>
+  </defs>
+
+  <!-- Centerline -->
+  <line x1="0" y1="40" x2="160" y2="40" class="centerline"/>
+
+  <!-- Segment positions (calculated from research) -->
+  <!-- x = lerp(7, -9, t) * scale, scaled to viewBox -->
+  <!-- widths calculated with peak at 70% -->
+
+  <!-- Segment 0: Front (x=70, w=4.5*5=22.5) -->
+  <line x1="70" y1="28.75" x2="70" y2="51.25" class="segment-line"/>
+  <ellipse cx="70" cy="40" rx="2" ry="11.25" class="segment"/>
+  <text x="72" y="42" class="label">0</text>
+
+  <!-- Segment 1: (x=82, w=5.3*5=26.5) -->
+  <line x1="82" y1="26.75" x2="82" y2="53.25" class="segment-line"/>
+  <ellipse cx="82" cy="40" rx="2" ry="13.25" class="segment"/>
+  <text x="84" y="42" class="label">1</text>
+
+  <!-- Segment 2: (x=94, w=6.0*5=30) -->
+  <line x1="94" y1="25" x2="94" y2="55" class="segment-line"/>
+  <ellipse cx="94" cy="40" rx="2" ry="15" class="segment"/>
+  <text x="96" y="42" class="label">2</text>
+
+  <!-- Segment 3: (x=106, w=6.7*5=33.5) -->
+  <line x1="106" y1="23.25" x2="106" y2="56.75" class="segment-line"/>
+  <ellipse cx="106" cy="40" rx="2" ry="16.75" class="segment"/>
+  <text x="108" y="42" class="label">3</text>
+
+  <!-- Segment 4: (x=118, w=7.3*5=36.5) -->
+  <line x1="118" y1="21.75" x2="118" y2="58.25" class="segment-line"/>
+  <ellipse cx="118" cy="40" rx="2" ry="18.25" class="segment"/>
+  <text x="120" y="42" class="label">4</text>
+
+  <!-- Segment 5: (x=130, w=7.8*5=39) -->
+  <line x1="130" y1="20.5" x2="130" y2="59.5" class="segment-line"/>
+  <ellipse cx="130" cy="40" rx="2" ry="19.5" class="segment"/>
+  <text x="132" y="42" class="label">5</text>
+
+  <!-- Segment 6: (x=142, w=8.0*5=40) -->
+  <line x1="142" y1="20" x2="142" y2="60" class="segment-line"/>
+  <ellipse cx="142" cy="40" rx="2" ry="20" class="segment"/>
+  <text x="144" y="42" class="label">6</text>
+
+  <!-- Segment 7: PEAK (x=154, w=8.0*5=40) -->
+  <line x1="154" y1="20" x2="154" y2="60" class="peak-marker" stroke-width="2"/>
+  <ellipse cx="154" cy="40" rx="2" ry="20" class="segment" stroke="#ff6600" stroke-width="1"/>
+  <text x="156" y="42" class="label" fill="#ff6600">7 PEAK</text>
+
+  <!-- Annotations -->
+  <text x="10" y="15" class="label">← Front (narrow: 4.5 units)</text>
+  <text x="140" y="15" class="label" fill="#ff6600">Peak (8.0 units) →</text>
+  <text x="10" y="75" class="label">Body length: ~16 units (10 segments)</text>
+</svg>
