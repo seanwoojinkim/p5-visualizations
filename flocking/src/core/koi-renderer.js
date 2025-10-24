@@ -67,6 +67,13 @@ export class KoiRenderer {
      * @param {number} params.modifiers.brightnessBoost - Brightness boost amount (default: 0)
      * @param {number} params.modifiers.saturationBoost - Saturation boost amount (default: 0)
      * @param {number} params.modifiers.sizeScale - Additional size scaling (default: 1)
+     * @param {Object} params.svgVertices - Optional SVG vertices for body parts
+     * @param {Array<{x,y}>} params.svgVertices.body - Body vertices
+     * @param {Array<{x,y}>} params.svgVertices.tail - Tail vertices
+     * @param {Array<{x,y}>} params.svgVertices.head - Head vertices
+     * @param {Array<{x,y}>} params.svgVertices.pectoralFin - Pectoral fin vertices
+     * @param {Array<{x,y}>} params.svgVertices.dorsalFin - Dorsal fin vertices
+     * @param {Array<{x,y}>} params.svgVertices.ventralFin - Ventral fin vertices
      */
     render(context, x, y, angle, params) {
         const {
@@ -74,7 +81,15 @@ export class KoiRenderer {
             colorParams = { h: 0, s: 0, b: 90 },
             pattern = { spots: [] },
             animationParams = { waveTime: 0, sizeScale: 1, lengthMultiplier: 1, tailLength: 1 },
-            modifiers = { brightnessBoost: 0, saturationBoost: 0, sizeScale: 1 }
+            modifiers = { brightnessBoost: 0, saturationBoost: 0, sizeScale: 1 },
+            svgVertices = {
+                body: null,
+                tail: null,
+                head: null,
+                pectoralFin: null,
+                dorsalFin: null,
+                ventralFin: null
+            }
         } = params;
 
         const { waveTime, sizeScale, lengthMultiplier = 1, tailLength = 1 } = animationParams;
@@ -110,9 +125,20 @@ export class KoiRenderer {
         // 4. Head (drawn before spots so spots appear on head)
         // 5. Spots (drawn last, on top of everything including head)
 
-        this.drawFins(context, segmentPositions, shapeParams, waveTime, finalSizeScale, hue, saturation, brightness);
-        this.drawTail(context, segmentPositions, shapeParams, waveTime, finalSizeScale, tailLength, hue, saturation, brightness);
-        this.drawBody(context, segmentPositions, shapeParams, finalSizeScale, hue, saturation, brightness);
+        this.drawFins(context, segmentPositions, shapeParams, waveTime, finalSizeScale, hue, saturation, brightness, {
+            pectoralFin: svgVertices.pectoralFin,
+            dorsalFin: svgVertices.dorsalFin,
+            ventralFin: svgVertices.ventralFin
+        });
+        this.drawTail(context, segmentPositions, shapeParams, waveTime, finalSizeScale, tailLength, hue, saturation, brightness, svgVertices.tail);
+
+        // Use SVG body if vertices provided, otherwise use procedural body
+        if (svgVertices.body && svgVertices.body.length > 0) {
+            this.drawBodyFromSVG(context, segmentPositions, svgVertices.body, shapeParams, finalSizeScale, hue, saturation, brightness);
+        } else {
+            this.drawBody(context, segmentPositions, shapeParams, finalSizeScale, hue, saturation, brightness);
+        }
+
         this.drawHead(context, segmentPositions[0], shapeParams, finalSizeScale, hue, saturation, brightness);
         this.drawSpots(context, segmentPositions, pattern.spots || [], finalSizeScale);
 
@@ -160,10 +186,150 @@ export class KoiRenderer {
     }
 
     /**
+     * Draw single fin from SVG vertices with rotation/sway animation
+     * Helper method for rendering individual fins with 'rotate' deformation
+     * @param {Object} context - p5 graphics context
+     * @param {Object} segmentPos - Segment position {x, y, w}
+     * @param {Array<{x, y}>} svgVertices - Fin SVG vertices
+     * @param {number} yOffset - Y offset from segment center
+     * @param {number} baseAngle - Base rotation angle in radians
+     * @param {number} waveTime - Animation time
+     * @param {number} rotationAmplitude - Rotation animation amplitude in radians
+     * @param {number} sway - Y sway offset (additional vertical motion)
+     * @param {number} sizeScale - Size multiplier
+     * @param {number} hue - HSB hue
+     * @param {number} saturation - HSB saturation
+     * @param {number} brightness - HSB brightness
+     * @param {string} [mirror='none'] - Mirror type ('none', 'horizontal', 'vertical')
+     */
+    drawFinFromSVG(context, segmentPos, svgVertices, yOffset, baseAngle, waveTime, rotationAmplitude, sway, sizeScale, hue, saturation, brightness, mirror = 'none') {
+        this.drawSVGShape(context, svgVertices, {
+            deformationType: 'rotate',
+            deformationParams: {
+                waveTime,
+                rotationAmplitude,
+                rotationFrequency: 1.2, // Matches procedural: waveTime * 1.2
+                pivot: { x: 0, y: 0 }, // Rotate around base (left edge)
+                ySwayAmplitude: 0, // Y sway applied via positionY instead
+                ySwayPhase: 0
+            },
+            positionX: segmentPos.x,
+            positionY: segmentPos.y + yOffset * sizeScale + sway,
+            rotation: baseAngle, // Base angle applied to entire shape
+            scale: sizeScale,
+            hue,
+            saturation: saturation + 8,
+            brightness: brightness - 15,
+            opacity: this.useSumieStyle ? 0.6 : 0.7,
+            mirror
+        });
+    }
+
+    /**
      * Draw all fins (dorsal, pectoral, ventral)
      * Rendered FIRST so they appear behind the body
+     * Uses SVG if vertices provided, otherwise uses procedural rendering
+     * @param {Object} context - p5 graphics context
+     * @param {Array<{x, y, w}>} segmentPositions - Body segment positions
+     * @param {Object} shapeParams - Shape parameters
+     * @param {number} waveTime - Animation time
+     * @param {number} sizeScale - Size multiplier
+     * @param {number} hue - HSB hue
+     * @param {number} saturation - HSB saturation
+     * @param {number} brightness - HSB brightness
+     * @param {Object} [svgVertices={}] - SVG vertices for fins
+     * @param {Array<{x,y}>} [svgVertices.pectoralFin] - Pectoral fin vertices
+     * @param {Array<{x,y}>} [svgVertices.dorsalFin] - Dorsal fin vertices
+     * @param {Array<{x,y}>} [svgVertices.ventralFin] - Ventral fin vertices
      */
-    drawFins(context, segmentPositions, shapeParams, waveTime, sizeScale, hue, saturation, brightness) {
+    drawFins(context, segmentPositions, shapeParams, waveTime, sizeScale, hue, saturation, brightness, svgVertices = {}) {
+        // Check if we should use SVG rendering for any fins
+        const useSVG = svgVertices.pectoralFin || svgVertices.dorsalFin || svgVertices.ventralFin;
+
+        if (useSVG) {
+            // SVG-based fin rendering
+            const finSway = Math.sin(waveTime - 0.5) * 0.8;
+
+            // Pectoral fins (left and right)
+            const finPos = segmentPositions[shapeParams.pectoralPos];
+            if (svgVertices.pectoralFin) {
+                // Top pectoral fin (left)
+                this.drawFinFromSVG(
+                    context, finPos, svgVertices.pectoralFin,
+                    shapeParams.pectoralYTop,
+                    shapeParams.pectoralAngleTop,
+                    waveTime,
+                    0.15, // rotationAmplitude
+                    finSway,
+                    sizeScale,
+                    hue, saturation, brightness,
+                    'none'
+                );
+
+                // Bottom pectoral fin (right) - mirrored vertically
+                this.drawFinFromSVG(
+                    context, finPos, svgVertices.pectoralFin,
+                    shapeParams.pectoralYBottom,
+                    shapeParams.pectoralAngleBottom,
+                    waveTime,
+                    -0.15, // Negative for opposite rotation
+                    -finSway, // Opposite sway
+                    sizeScale,
+                    hue, saturation, brightness,
+                    'vertical' // Mirror vertically for bottom fin
+                );
+            }
+
+            // Dorsal fin
+            const dorsalPos = segmentPositions[shapeParams.dorsalPos];
+            if (svgVertices.dorsalFin) {
+                this.drawFinFromSVG(
+                    context, dorsalPos, svgVertices.dorsalFin,
+                    shapeParams.dorsalY,
+                    -0.2, // Base angle (static)
+                    waveTime,
+                    0, // No rotation animation for dorsal fin
+                    0, // No sway
+                    sizeScale,
+                    hue, saturation, brightness,
+                    'none'
+                );
+            }
+
+            // Ventral fins (top and bottom)
+            const ventralPos = segmentPositions[shapeParams.ventralPos];
+            if (svgVertices.ventralFin) {
+                // Top ventral fin
+                this.drawFinFromSVG(
+                    context, ventralPos, svgVertices.ventralFin,
+                    shapeParams.ventralYTop,
+                    shapeParams.ventralAngleTop,
+                    waveTime,
+                    0.1, // rotationAmplitude
+                    0, // No sway
+                    sizeScale,
+                    hue, saturation, brightness,
+                    'none'
+                );
+
+                // Bottom ventral fin - mirrored vertically
+                this.drawFinFromSVG(
+                    context, ventralPos, svgVertices.ventralFin,
+                    shapeParams.ventralYBottom,
+                    shapeParams.ventralAngleBottom,
+                    waveTime,
+                    -0.1, // Opposite rotation
+                    0,
+                    sizeScale,
+                    hue, saturation, brightness,
+                    'vertical' // Mirror vertically for bottom fin
+                );
+            }
+
+            return; // Exit early - SVG rendering complete
+        }
+
+        // PROCEDURAL FIN RENDERING (fallback)
         const finSway = Math.sin(waveTime - 0.5) * 0.8;
         const finOpacity = this.useSumieStyle ? 0.6 : 0.7;
         const layers = this.useSumieStyle ? 2 : 1; // Lighter layering for fins
@@ -248,9 +414,69 @@ export class KoiRenderer {
     }
 
     /**
-     * Draw tail with flowing motion
+     * Draw tail from SVG vertices with flutter animation
+     * Uses generalized drawSVGShape with flutter deformation matching procedural tail
+     * @param {Object} context - p5 graphics context
+     * @param {Array<{x, y, w}>} segmentPositions - Body segment positions
+     * @param {Array<{x, y}>} svgVertices - Tail SVG vertices
+     * @param {Object} shapeParams - Shape parameters
+     * @param {number} waveTime - Animation time
+     * @param {number} sizeScale - Size multiplier
+     * @param {number} tailLength - Tail length multiplier
+     * @param {number} hue - HSB hue
+     * @param {number} saturation - HSB saturation
+     * @param {number} brightness - HSB brightness
      */
-    drawTail(context, segmentPositions, shapeParams, waveTime, sizeScale, tailLength, hue, saturation, brightness) {
+    drawTailFromSVG(context, segmentPositions, svgVertices, shapeParams, waveTime, sizeScale, tailLength, hue, saturation, brightness) {
+        const tailBase = segmentPositions[segmentPositions.length - 1];
+        const tailStartX = tailBase.x + shapeParams.tailStartX * sizeScale;
+
+        // Create extended segments for tail (continues body wave motion)
+        // Tail extends beyond body segments, continuing the wave pattern
+        const numTailSegments = 6;
+        const tailSegments = [];
+        const bodySegmentCount = segmentPositions.length;
+
+        for (let i = 0; i < numTailSegments; i++) {
+            const t = i / numTailSegments;
+            const x = tailStartX - (t * tailLength * 6 * sizeScale);
+            // Continue the wave formula from body: Math.sin(waveTime - t * 3.5)
+            // But adjust t to continue from where body left off
+            const waveT = 1 + (t * 0.5); // Continue wave beyond body end (t=1)
+            const y = Math.sin(waveTime - waveT * 3.5) * 1.5 * sizeScale * (1 - waveT * 0.2);
+            tailSegments.push({ x, y, w: 0 });
+        }
+
+        this.drawSVGShape(context, svgVertices, {
+            deformationType: 'wave',
+            deformationParams: {
+                segmentPositions: tailSegments,
+                numSegments: numTailSegments
+            },
+            positionX: tailStartX,  // Position tail at back of body
+            positionY: tailBase.y,  // At body's Y position (inherits body wave)
+            rotation: 0,
+            scale: sizeScale * tailLength,
+            hue,
+            saturation: saturation + 5,
+            brightness: brightness - 12,
+            opacity: this.useSumieStyle ? 0.7 : 0.8,
+            mirror: 'none'
+        });
+    }
+
+    /**
+     * Draw tail with flowing motion
+     * Uses SVG if vertices provided, otherwise uses procedural rendering
+     */
+    drawTail(context, segmentPositions, shapeParams, waveTime, sizeScale, tailLength, hue, saturation, brightness, svgVertices = null) {
+        // Use SVG if provided, otherwise procedural
+        if (svgVertices && svgVertices.length > 0) {
+            this.drawTailFromSVG(context, segmentPositions, svgVertices, shapeParams, waveTime, sizeScale, tailLength, hue, saturation, brightness);
+            return;
+        }
+
+        // Original procedural tail rendering code
         const tailBase = segmentPositions[segmentPositions.length - 1];
         const tailStartX = tailBase.x + shapeParams.tailStartX * sizeScale;
         const tailSegments = 6;
@@ -308,6 +534,307 @@ export class KoiRenderer {
         context.curveVertex(bottomPoints[0].x, bottomPoints[0].y);
 
         context.endShape(context.CLOSE);
+    }
+
+    /**
+     * Apply wave deformation to SVG vertices (body wave)
+     * Maps each vertex to a body segment and applies the segment's wave offset
+     * @param {Array<{x, y}>} vertices - Original SVG vertices
+     * @param {Object} params - Deformation parameters
+     * @param {Array<{x, y, w}>} params.segmentPositions - Body segments with wave offsets
+     * @param {number} params.numSegments - Number of body segments
+     * @returns {Array<{x, y}>} - Deformed vertices
+     */
+    applyWaveDeformation(vertices, params) {
+        const { segmentPositions, numSegments } = params;
+
+        return vertices.map(v => {
+            const segIdx = this.mapVertexToSegment(v.x, vertices, numSegments);
+            const segment = segmentPositions[segIdx];
+            return {
+                x: v.x,
+                y: v.y + segment.y
+            };
+        });
+    }
+
+    /**
+     * Apply flutter deformation to SVG vertices (tail flutter)
+     * Creates a traveling wave effect from base to tip with increasing amplitude
+     * Matches procedural tail flutter: Math.sin(waveTime - 2.5 - t * 2) * 3 * sizeScale * (0.5 + t * 0.5)
+     * @param {Array<{x, y}>} vertices - Original SVG vertices
+     * @param {Object} params - Flutter parameters
+     * @param {number} params.waveTime - Animation time
+     * @param {number} params.sizeScale - Size multiplier
+     * @param {number} [params.phaseOffset=-2.5] - Phase offset for wave
+     * @param {number} [params.phaseGradient=-2] - Phase change per unit distance (creates traveling wave)
+     * @param {number} [params.amplitudeStart=0.5] - Flutter amplitude at base (multiplier)
+     * @param {number} [params.amplitudeEnd=1.0] - Flutter amplitude at tip (multiplier)
+     * @param {number} [params.amplitudeScale=3] - Overall amplitude scaling
+     * @returns {Array<{x, y}>} - Deformed vertices
+     */
+    applyFlutterDeformation(vertices, params) {
+        const {
+            waveTime,
+            sizeScale,
+            phaseOffset = -2.5,
+            phaseGradient = -2,
+            amplitudeStart = 0.5,
+            amplitudeEnd = 1.0,
+            amplitudeScale = 3
+        } = params;
+
+        // Find X bounds for normalization (0 to 1 from base to tip)
+        const xs = vertices.map(v => v.x);
+        const minX = Math.min(...xs);
+        const maxX = Math.max(...xs);
+        const rangeX = maxX - minX;
+
+        if (rangeX === 0) return vertices; // Prevent division by zero
+
+        return vertices.map(v => {
+            const t = (v.x - minX) / rangeX; // 0 at base, 1 at tip
+
+            // Phase increases toward tip (creates traveling wave)
+            const phase = waveTime + phaseOffset + (t * phaseGradient);
+
+            // Amplitude increases toward tip
+            const amplitude = amplitudeStart + (t * (amplitudeEnd - amplitudeStart));
+
+            // Flutter offset
+            const flutter = Math.sin(phase) * amplitudeScale * sizeScale * amplitude;
+
+            return {
+                x: v.x,
+                y: v.y + flutter
+            };
+        });
+    }
+
+    /**
+     * Apply rotation deformation to SVG vertices (fin rotation/sway)
+     * Rotates vertices around a pivot point with optional Y sway
+     * Matches procedural fin animation formulas
+     * @param {Array<{x, y}>} vertices - Original SVG vertices
+     * @param {Object} params - Rotation parameters
+     * @param {number} params.waveTime - Animation time
+     * @param {number} [params.rotationAmplitude=0] - Rotation amplitude in radians
+     * @param {number} [params.rotationFrequency=1.2] - Rotation frequency multiplier
+     * @param {Object} [params.pivot={x:0,y:0}] - Rotation pivot point
+     * @param {number} [params.ySwayAmplitude=0] - Y sway amplitude (optional)
+     * @param {number} [params.ySwayPhase=-0.5] - Y sway phase offset
+     * @returns {Array<{x, y}>} - Deformed vertices
+     */
+    applyRotationDeformation(vertices, params) {
+        const {
+            waveTime,
+            rotationAmplitude = 0,
+            rotationFrequency = 1.2,
+            pivot = { x: 0, y: 0 },
+            ySwayAmplitude = 0,
+            ySwayPhase = -0.5
+        } = params;
+
+        const rotationAngle = Math.sin(waveTime * rotationFrequency) * rotationAmplitude;
+        const ySway = ySwayAmplitude ? Math.sin(waveTime + ySwayPhase) * ySwayAmplitude : 0;
+
+        const cos = Math.cos(rotationAngle);
+        const sin = Math.sin(rotationAngle);
+
+        return vertices.map(v => {
+            const dx = v.x - pivot.x;
+            const dy = v.y - pivot.y;
+
+            const rotatedX = dx * cos - dy * sin;
+            const rotatedY = dx * sin + dy * cos;
+
+            return {
+                x: rotatedX + pivot.x,
+                y: rotatedY + pivot.y + ySway
+            };
+        });
+    }
+
+    /**
+     * Apply general deformation to vertices based on type
+     * Dispatcher method that routes to specific deformation implementations
+     * @param {Array<{x, y}>} vertices - Original vertices
+     * @param {string} type - Deformation type ('wave', 'flutter', 'rotate', 'static')
+     * @param {Object} params - Type-specific parameters
+     * @returns {Array<{x, y}>} - Deformed vertices
+     */
+    applyDeformation(vertices, type, params) {
+        switch (type) {
+            case 'wave':
+                return this.applyWaveDeformation(vertices, params);
+            case 'flutter':
+                return this.applyFlutterDeformation(vertices, params);
+            case 'rotate':
+                return this.applyRotationDeformation(vertices, params);
+            case 'static':
+                return vertices; // No deformation
+            default:
+                console.warn(`Unknown deformation type: ${type}`);
+                return vertices;
+        }
+    }
+
+    /**
+     * Apply mirror transformation to vertices
+     * Used for flipping fins and other symmetric body parts
+     * @param {Array<{x, y}>} vertices - Original vertices
+     * @param {string} mirror - Mirror type ('none', 'horizontal', 'vertical')
+     * @returns {Array<{x, y}>} - Mirrored vertices
+     */
+    applyMirror(vertices, mirror) {
+        if (mirror === 'none') return vertices;
+
+        return vertices.map(v => ({
+            x: mirror === 'horizontal' ? -v.x : v.x,
+            y: mirror === 'vertical' ? -v.y : v.y
+        }));
+    }
+
+    /**
+     * Map vertex X coordinate to body segment index
+     * SVG vertices span from negative X (tail) to positive X (head)
+     * Body segments span from 0 (head/front) to numSegments-1 (tail/back)
+     * @param {number} vertexX - X coordinate of SVG vertex
+     * @param {Array<{x, y}>} svgVertices - All SVG vertices for bounds calculation
+     * @param {number} numSegments - Number of body segments
+     * @returns {number} - Segment index (0 to numSegments-1)
+     */
+    mapVertexToSegment(vertexX, svgVertices, numSegments) {
+        // Find X bounds of SVG vertices
+        const xs = svgVertices.map(v => v.x);
+        const minX = Math.min(...xs);
+        const maxX = Math.max(...xs);
+
+        // Normalize vertex X to 0-1 range
+        // For koi body: positive X = head/front, negative X = tail/back
+        const t = (vertexX - minX) / (maxX - minX);
+
+        // IMPORTANT: Flip t because SVG has head at positive X, but segments[0] is head
+        // Segment 0 should be at maxX (head), segment numSegments-1 at minX (tail)
+        const flippedT = 1 - t;
+
+        // Map to segment index
+        const segmentIndex = Math.floor(flippedT * numSegments);
+
+        // Clamp to valid range
+        return Math.min(Math.max(0, segmentIndex), numSegments - 1);
+    }
+
+    /**
+     * Draw SVG shape with deformation, transform, and sumi-e layering
+     * Generalized method for rendering any SVG body part with animation
+     * @param {Object} context - p5 graphics context
+     * @param {Array<{x, y}>} svgVertices - Original SVG vertices
+     * @param {Object} config - Rendering configuration
+     * @param {string} [config.deformationType='static'] - Type of deformation ('wave', 'flutter', 'rotate', 'static')
+     * @param {Object} [config.deformationParams={}] - Parameters for deformation
+     * @param {number} [config.positionX=0] - X position in canvas space
+     * @param {number} [config.positionY=0] - Y position in canvas space
+     * @param {number} [config.rotation=0] - Rotation angle in radians
+     * @param {number} [config.scale=1] - Scale multiplier
+     * @param {number} config.hue - HSB hue
+     * @param {number} config.saturation - HSB saturation
+     * @param {number} config.brightness - HSB brightness
+     * @param {number} [config.opacity=0.8] - Base opacity (0-1)
+     * @param {string} [config.mirror='none'] - Mirror type ('none', 'horizontal', 'vertical')
+     */
+    drawSVGShape(context, svgVertices, config) {
+        if (!svgVertices || svgVertices.length === 0) {
+            console.warn('drawSVGShape: No vertices provided');
+            return;
+        }
+
+        const {
+            deformationType = 'static',
+            deformationParams = {},
+            positionX = 0,
+            positionY = 0,
+            rotation = 0,
+            scale = 1,
+            hue,
+            saturation,
+            brightness,
+            opacity = 0.8,
+            mirror = 'none'
+        } = config;
+
+        // 1. Apply deformation
+        let vertices = this.applyDeformation(svgVertices, deformationType, deformationParams);
+
+        // 2. Apply mirror
+        vertices = this.applyMirror(vertices, mirror);
+
+        // 3. Render with transform and sumi-e layers
+        context.push();
+        context.translate(positionX, positionY);
+        context.rotate(rotation);
+
+        if (this.useSumieStyle) {
+            // 3-layer rendering for soft edges
+            for (let layer = 0; layer < 3; layer++) {
+                const offset = (layer - 1) * 0.3;
+                const layerOpacity = layer === 1 ? opacity : opacity * 0.4;
+
+                context.fill(hue, saturation, brightness, layerOpacity);
+                context.beginShape();
+
+                for (let v of vertices) {
+                    context.curveVertex(v.x * scale + offset, v.y * scale + offset);
+                }
+
+                context.endShape(context.CLOSE);
+            }
+        } else {
+            // Normal rendering
+            context.fill(hue, saturation, brightness, opacity);
+            context.beginShape();
+
+            for (let v of vertices) {
+                context.curveVertex(v.x * scale, v.y * scale);
+            }
+
+            context.endShape(context.CLOSE);
+        }
+
+        context.pop();
+    }
+
+    /**
+     * Draw body from SVG vertices with wave deformation
+     * Refactored to use generalized drawSVGShape method
+     * @param {Object} context - p5 graphics context
+     * @param {Array<{x, y, w}>} segmentPositions - Body segment positions with wave offsets
+     * @param {Array<{x, y}>} svgVertices - SVG vertices normalized to koi coordinate space
+     * @param {Object} shapeParams - Shape parameters
+     * @param {number} sizeScale - Size multiplier
+     * @param {number} hue - HSB hue
+     * @param {number} saturation - HSB saturation
+     * @param {number} brightness - HSB brightness
+     */
+    drawBodyFromSVG(context, segmentPositions, svgVertices, shapeParams, sizeScale, hue, saturation, brightness) {
+        this.drawSVGShape(context, svgVertices, {
+            deformationType: 'wave',
+            deformationParams: {
+                segmentPositions,
+                numSegments: segmentPositions.length
+            },
+            positionX: 0,
+            positionY: 0,
+            rotation: 0,
+            scale: sizeScale,
+            hue,
+            saturation,
+            brightness: brightness - 2,
+            opacity: this.useSumieStyle ? 0.7 : 0.92,
+            mirror: 'none'
+        });
+
+        context.noStroke(); // Match original behavior
     }
 
     /**

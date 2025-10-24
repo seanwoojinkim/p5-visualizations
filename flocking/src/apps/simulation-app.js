@@ -11,6 +11,7 @@ import { KoiRenderer } from '../core/koi-renderer.js';
 import { DEFAULT_SHAPE_PARAMS } from '../core/koi-params.js';
 import { ControlPanel } from '../ui/control-panel.js';
 import { BrushTextures } from '../rendering/brush-textures.js';
+import { SVGParser } from '../core/svg-parser.js';
 
 // Global state
 let flock;
@@ -20,6 +21,14 @@ let renderer;
 let controlPanel;
 let brushTextures;
 let backgroundImage;
+
+// SVG vertices for all koi body parts
+let bodyVertices = null;
+let tailVertices = null;
+let headVertices = null;
+let pectoralFinVertices = null;
+let dorsalFinVertices = null;
+let ventralFinVertices = null;
 
 // Detect mobile/small screens and adjust defaults for performance
 const isMobile = window.innerWidth < 768 || /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
@@ -49,8 +58,75 @@ console.log(`   Optimized defaults: ${params.numBoids} koi, pixel scale ${params
 let debugVectors = false;
 
 // p5.js preload function (loads assets before setup)
-window.preload = function() {
+window.preload = async function() {
     backgroundImage = loadImage('assets/water-background.png');
+
+    // Load and parse all SVG body parts
+    // Target dimensions match koi coordinate space for each part
+
+    console.log('Loading SVG body parts...');
+
+    // Body: 16 × 5.2 units (X: -8 to +8, Y: -2.6 to +2.6)
+    bodyVertices = await SVGParser.loadSVGFromURL(
+        'assets/koi/body-parts/body.svg',
+        20,
+        { width: 16, height: 5.2 }
+    );
+
+    // Tail: 6 × 4 units (length × max width, matches procedural base dimensions)
+    tailVertices = await SVGParser.loadSVGFromURL(
+        'assets/koi/body-parts/tail.svg',
+        20,
+        { width: 6, height: 4 }
+    );
+
+    // Head: 7.5 × 5.0 units (width × height, matches procedural ellipse)
+    headVertices = await SVGParser.loadSVGFromURL(
+        'assets/koi/body-parts/head.svg',
+        20,
+        { width: 7.5, height: 5.0 }
+    );
+
+    // Pectoral fin: 4.5 × 2 units (length × width, elliptical)
+    pectoralFinVertices = await SVGParser.loadSVGFromURL(
+        'assets/koi/body-parts/pectoral-fin.svg',
+        20,
+        { width: 4.5, height: 2 }
+    );
+
+    // Dorsal fin: 4 × 5 units (width × height)
+    dorsalFinVertices = await SVGParser.loadSVGFromURL(
+        'assets/koi/body-parts/dorsal-fin.svg',
+        20,
+        { width: 4, height: 5 }
+    );
+
+    // Ventral fin: 3 × 1.5 units (length × width, elliptical)
+    ventralFinVertices = await SVGParser.loadSVGFromURL(
+        'assets/koi/body-parts/ventral-fin.svg',
+        20,
+        { width: 3, height: 1.5 }
+    );
+
+    // Log loading results for all parts
+    const parts = {
+        body: bodyVertices,
+        tail: tailVertices,
+        head: headVertices,
+        pectoralFin: pectoralFinVertices,
+        dorsalFin: dorsalFinVertices,
+        ventralFin: ventralFinVertices
+    };
+
+    console.log('SVG body parts loaded:');
+    for (const [name, vertices] of Object.entries(parts)) {
+        if (vertices) {
+            const info = SVGParser.getDebugInfo(vertices);
+            console.log(`  ${name}: ${info.vertexCount} vertices, bounds: ${JSON.stringify(info.bounds)}`);
+        } else {
+            console.warn(`  ${name}: FAILED to load (will use procedural fallback)`);
+        }
+    }
 };
 
 // p5.js setup function
@@ -225,6 +301,14 @@ window.draw = function() {
                     brightnessBoost: audioData.bass * 8 * params.audioReactivity,
                     saturationBoost: audioData.treble * 10 * params.audioReactivity,
                     sizeScale: 1 + audioData.amplitude * 0.3 * params.audioReactivity
+                },
+                svgVertices: {
+                    body: bodyVertices,
+                    tail: tailVertices,
+                    head: headVertices,
+                    pectoralFin: pectoralFinVertices,
+                    dorsalFin: dorsalFinVertices,
+                    ventralFin: ventralFinVertices
                 }
             }
         );

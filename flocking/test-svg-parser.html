@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SVG Parser Test</title>
+    <style>
+        body {
+            font-family: monospace;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        h1 {
+            color: #333;
+        }
+        #output {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        #canvas-container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            display: inline-block;
+        }
+        pre {
+            background: #f8f8f8;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+        .success {
+            color: #28a745;
+        }
+        .error {
+            color: #dc3545;
+        }
+        .info {
+            color: #007bff;
+        }
+    </style>
+</head>
+<body>
+    <h1>SVG Parser Test - body.svg</h1>
+    <div id="output">
+        <p>Loading SVG parser...</p>
+    </div>
+    <div id="canvas-container">
+        <canvas id="visualizer" width="800" height="400"></canvas>
+    </div>
+
+    <script type="module">
+        import { SVGParser } from './src/core/svg-parser.js';
+
+        const output = document.getElementById('output');
+        const canvas = document.getElementById('visualizer');
+        const ctx = canvas.getContext('2d');
+
+        async function testParser() {
+            output.innerHTML = '<p class="info">Loading body.svg...</p>';
+
+            try {
+                // Load the SVG file
+                const url = './assets/koi/body-parts/body.svg';
+                const response = await fetch(url);
+
+                if (!response.ok) {
+                    throw new Error(`Failed to load: ${response.statusText}`);
+                }
+
+                const svgText = await response.text();
+                output.innerHTML += '<p class="success">✓ SVG file loaded successfully</p>';
+
+                // Parse without normalization first (to see raw coordinates)
+                const rawVertices = SVGParser.parseSVGFile(svgText);
+
+                if (!rawVertices) {
+                    throw new Error('Failed to parse SVG');
+                }
+
+                output.innerHTML += `<p class="success">✓ Parsed ${rawVertices.length} vertices from polygon</p>`;
+
+                // Get debug info
+                const rawInfo = SVGParser.getDebugInfo(rawVertices);
+                output.innerHTML += `
+                    <h3>Raw Coordinates (from SVG file):</h3>
+                    <pre>${JSON.stringify(rawInfo, null, 2)}</pre>
+                `;
+
+                // Parse with normalization to koi dimensions (16×8 units)
+                const normalizedVertices = SVGParser.parseSVGFile(svgText, 20, { width: 16, height: 8 });
+                const normInfo = SVGParser.getDebugInfo(normalizedVertices);
+
+                output.innerHTML += `
+                    <h3>Normalized Coordinates (16×8 koi units, centered at origin):</h3>
+                    <pre>${JSON.stringify(normInfo, null, 2)}</pre>
+                `;
+
+                // Show first few vertices
+                output.innerHTML += `
+                    <h3>First 5 Normalized Vertices:</h3>
+                    <pre>${JSON.stringify(normalizedVertices.slice(0, 5), null, 2)}</pre>
+                `;
+
+                // Visualize both raw and normalized shapes
+                visualizeShapes(rawVertices, normalizedVertices);
+
+            } catch (error) {
+                output.innerHTML += `<p class="error">✗ Error: ${error.message}</p>`;
+                console.error('Test error:', error);
+            }
+        }
+
+        function visualizeShapes(rawVertices, normalizedVertices) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Draw raw vertices on left side
+            ctx.save();
+            ctx.translate(100, 200);
+            ctx.scale(2, 2); // Scale up for visibility
+
+            // Draw raw shape
+            ctx.strokeStyle = '#007bff';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            rawVertices.forEach((v, i) => {
+                if (i === 0) ctx.moveTo(v.x, v.y);
+                else ctx.lineTo(v.x, v.y);
+            });
+            ctx.closePath();
+            ctx.stroke();
+
+            // Draw vertices as dots
+            ctx.fillStyle = '#dc3545';
+            rawVertices.forEach(v => {
+                ctx.beginPath();
+                ctx.arc(v.x, v.y, 1, 0, Math.PI * 2);
+                ctx.fill();
+            });
+
+            ctx.restore();
+
+            // Label
+            ctx.fillStyle = '#333';
+            ctx.font = '14px monospace';
+            ctx.fillText('Raw SVG coordinates', 20, 30);
+            ctx.fillText(`(${rawVertices.length} vertices)`, 20, 50);
+
+            // Draw normalized vertices on right side
+            ctx.save();
+            ctx.translate(500, 200);
+            ctx.scale(20, 20); // Scale up normalized coordinates
+
+            // Draw normalized shape
+            ctx.strokeStyle = '#28a745';
+            ctx.lineWidth = 0.1;
+            ctx.beginPath();
+            normalizedVertices.forEach((v, i) => {
+                if (i === 0) ctx.moveTo(v.x, v.y);
+                else ctx.lineTo(v.x, v.y);
+            });
+            ctx.closePath();
+            ctx.stroke();
+
+            // Draw vertices as dots
+            ctx.fillStyle = '#dc3545';
+            normalizedVertices.forEach(v => {
+                ctx.beginPath();
+                ctx.arc(v.x, v.y, 0.15, 0, Math.PI * 2);
+                ctx.fill();
+            });
+
+            // Draw coordinate axes
+            ctx.strokeStyle = '#ccc';
+            ctx.lineWidth = 0.05;
+            ctx.beginPath();
+            ctx.moveTo(-10, 0);
+            ctx.lineTo(10, 0);
+            ctx.moveTo(0, -5);
+            ctx.lineTo(0, 5);
+            ctx.stroke();
+
+            ctx.restore();
+
+            // Label
+            ctx.fillStyle = '#333';
+            ctx.font = '14px monospace';
+            ctx.fillText('Normalized to 16×8 units (centered)', 420, 30);
+            ctx.fillText(`(${normalizedVertices.length} vertices)`, 420, 50);
+        }
+
+        // Run test
+        testParser();
+    </script>
+</body>
+</html>
