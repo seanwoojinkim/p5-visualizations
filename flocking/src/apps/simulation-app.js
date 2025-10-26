@@ -50,7 +50,7 @@ let params = {
     numBoids: isMobile ? 30 : (isSmallScreen ? 50 : 80),
     maxSpeed: 0.5,
     maxForce: 0.1,
-    separationWeight: 0.5,  // Reduced from 1.2 - overlap is OK in 2D top-down view
+    separationWeight: 1.0,  // Increased from 0.5 for better spacing
     alignmentWeight: 1.2,
     cohesionWeight: 1.0,
     trailAlpha: 40,
