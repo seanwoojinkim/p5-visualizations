@@ -36,6 +36,11 @@ export class KoiRenderer {
     constructor(brushTextures = null) {
         this.brushTextures = brushTextures;
         this.useSumieStyle = brushTextures !== null && brushTextures.isReady;
+
+        // Wave value cache for performance (eliminates ~800 Math.sin() calls per frame)
+        this.waveCache = null;
+        this.lastWaveTime = -1;
+        this.lastNumSegments = -1;
     }
 
     /**
@@ -1062,25 +1067,24 @@ export class KoiRenderer {
         const centerX = (firstSeg.x + lastSeg.x) / 2;
         const centerY = 0;
 
+        // Get pre-tinted texture from cache (performance optimization)
+        const tintedBody = this.brushTextures.getTintedBody(
+            { h: hue, s: saturation, b: brightness },
+            BRUSH_TEXTURE_CONFIG.BODY_TEXTURE_ALPHA
+        );
+
         // Assumes clipping region already established by caller (render method)
         // This avoids duplicate expensive clipping operations
         context.push();
         context.translate(centerX, centerY);
 
-        // Apply color tint (use body color)
-        context.colorMode(context.HSB);
-        context.tint(hue, saturation, brightness, BRUSH_TEXTURE_CONFIG.BODY_TEXTURE_ALPHA);
-
-        // Use MULTIPLY for integration with body color
+        // Draw pre-tinted texture with MULTIPLY blend mode
         context.blendMode(context.MULTIPLY);
-
-        // Draw texture scaled to body size
         context.imageMode(context.CENTER);
         const textureWidth = bodyWidth * BRUSH_TEXTURE_CONFIG.BODY_TEXTURE_SCALE;
         const textureHeight = bodyHeight * BRUSH_TEXTURE_CONFIG.BODY_TEXTURE_SCALE;
-        context.image(bodyTexture, 0, 0, textureWidth, textureHeight);
+        context.image(tintedBody, 0, 0, textureWidth, textureHeight);
 
-        context.noTint();
         context.pop();
     }
 

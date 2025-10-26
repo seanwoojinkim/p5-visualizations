@@ -124,6 +124,62 @@ export class BrushTextures {
     }
 
     /**
+     * Get a pre-tinted body texture (with LRU caching for performance)
+     * @param {Object} color - {h, s, b} HSB color to tint to
+     * @param {number} alpha - Alpha value (0-255)
+     * @returns {p5.Image|p5.Graphics} - Pre-tinted texture
+     */
+    getTintedBody(color, alpha) {
+        if (!this.p5Instance || !this.textures.body) {
+            return this.textures.body;
+        }
+
+        // Create cache key (same rounding as spots)
+        const h = Math.round(color.h / 5) * 5;
+        const s = Math.round(color.s / 5) * 5;
+        const b = Math.round(color.b / 5) * 5;
+        const a = Math.round(alpha / 10) * 10;
+        const cacheKey = `body_${h}_${s}_${b}_${a}`;
+
+        // Check cache (LRU: move to end if found)
+        if (this.tintCache.has(cacheKey)) {
+            const cached = this.tintCache.get(cacheKey);
+            this.tintCache.delete(cacheKey);
+            this.tintCache.set(cacheKey, cached);
+            this.cacheStats.hits++;
+            return cached;
+        }
+
+        // Cache miss: create tinted texture
+        this.cacheStats.misses++;
+
+        const tinted = this.p5Instance.createGraphics(
+            this.textures.body.width,
+            this.textures.body.height
+        );
+
+        tinted.push();
+        tinted.colorMode(tinted.HSB);
+        tinted.tint(color.h, color.s, color.b, alpha);
+        tinted.blendMode(tinted.BLEND);
+        tinted.image(this.textures.body, 0, 0);
+        tinted.noTint();
+        tinted.pop();
+
+        // Evict oldest if cache full
+        if (this.tintCache.size >= this.maxCacheSize) {
+            const firstKey = this.tintCache.keys().next().value;
+            const removed = this.tintCache.get(firstKey);
+            removed.remove();
+            this.tintCache.delete(firstKey);
+            this.cacheStats.evictions++;
+        }
+
+        this.tintCache.set(cacheKey, tinted);
+        return tinted;
+    }
+
+    /**
      * Clear the tint cache (useful for memory management)
      */
     clearTintCache() {
