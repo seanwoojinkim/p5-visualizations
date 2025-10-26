@@ -50,9 +50,9 @@ let params = {
     numBoids: isMobile ? 30 : (isSmallScreen ? 50 : 80),
     maxSpeed: 0.5,
     maxForce: 0.1,
-    separationWeight: 1.0,  // Maintain personal space
-    alignmentWeight: 1.0,   // Match direction without over-synchronizing
-    cohesionWeight: 0.6,    // Gentle pull toward group (reduced to avoid conflict with separation)
+    separationWeight: 1.0,  // Increased from 0.5 for better spacing
+    alignmentWeight: 1.2,
+    cohesionWeight: 1.0,
     trailAlpha: 40,
     audioReactivity: 0.5
 };
