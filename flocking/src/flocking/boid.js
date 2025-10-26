@@ -277,7 +277,7 @@ export class Boid {
 
         // Oscillation detection (rapid back-and-forth direction changes)
         // This system is always active to prevent boids from getting stuck
-        const currentHeading = this.velocity.heading();
+        // (reuse currentHeading from derivative damping above)
 
         // Add current heading to history
         this.headingHistory.push(currentHeading);
