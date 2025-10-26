@@ -30,10 +30,10 @@ export class Boid {
         this.previousAlignment = createVectorFunc();
         this.previousCohesion = createVectorFunc();
 
-        // Debug tracking for oscillation (rapid back-and-forth direction changes)
+        // Oscillation detection (rapid back-and-forth direction changes)
+        // This system is always active to prevent boids from getting stuck
         this.previousHeading = this.velocity.heading();
         this.headingHistory = []; // Track last PHYSICS_CONFIG.OSCILLATION_HISTORY_LENGTH headings
-        this.debugOscillation = true; // Set to false to disable debug logging
 
         // Derivative damping - track heading velocity for PID D-term
         this.headingVelocity = 0;
@@ -275,54 +275,53 @@ export class Boid {
         const smoothing = PHYSICS_CONFIG.VELOCITY_SMOOTHING;
         this.velocity.lerp(targetVelocity, smoothing);
 
-        // Debug: detect oscillation (rapid back-and-forth direction changes)
-        if (this.debugOscillation) {
-            const currentHeading = this.velocity.heading();
+        // Oscillation detection (rapid back-and-forth direction changes)
+        // This system is always active to prevent boids from getting stuck
+        const currentHeading = this.velocity.heading();
 
-            // Add current heading to history
-            this.headingHistory.push(currentHeading);
+        // Add current heading to history
+        this.headingHistory.push(currentHeading);
 
-            // Keep only last N frames
-            if (this.headingHistory.length > PHYSICS_CONFIG.OSCILLATION_HISTORY_LENGTH) {
-                this.headingHistory.shift();
-            }
-
-            // Check for oscillation if we have enough history
-            if (this.headingHistory.length >= PHYSICS_CONFIG.OSCILLATION_CHECK_LENGTH) {
-                // Calculate direction changes between consecutive frames
-                const changes = [];
-                for (let i = 1; i < this.headingHistory.length; i++) {
-                    let diff = this.headingHistory[i] - this.headingHistory[i - 1];
-                    // Normalize to -PI to PI
-                    while (diff > Math.PI) diff -= Math.PI * 2;
-                    while (diff < -Math.PI) diff += Math.PI * 2;
-                    changes.push(diff);
-                }
-
-                // Count direction reversals (sign changes in consecutive changes)
-                let reversals = 0;
-                for (let i = 1; i < changes.length; i++) {
-                    // If signs are opposite, it's a reversal
-                    if ((changes[i] > 0 && changes[i-1] < 0) || (changes[i] < 0 && changes[i-1] > 0)) {
-                        reversals++;
-                    }
-                }
-
-                // If we have N+ reversals in recent frames, that's oscillation
-                // But only trigger if not in cooldown period
-                const now = Date.now();
-                if (reversals >= PHYSICS_CONFIG.OSCILLATION_REVERSAL_THRESHOLD &&
-                    !this.isEscaping && now > this.escapeCooldownEndTime) {
-                    // Trigger escape maneuver
-                    this.triggerEscapeManeuver(randomFunc);
-
-                    // Clear history after triggering escape
-                    this.headingHistory = [];
-                }
-            }
-
-            this.previousHeading = currentHeading;
+        // Keep only last N frames
+        if (this.headingHistory.length > PHYSICS_CONFIG.OSCILLATION_HISTORY_LENGTH) {
+            this.headingHistory.shift();
         }
+
+        // Check for oscillation if we have enough history
+        if (this.headingHistory.length >= PHYSICS_CONFIG.OSCILLATION_CHECK_LENGTH) {
+            // Calculate direction changes between consecutive frames
+            const changes = [];
+            for (let i = 1; i < this.headingHistory.length; i++) {
+                let diff = this.headingHistory[i] - this.headingHistory[i - 1];
+                // Normalize to -PI to PI
+                while (diff > Math.PI) diff -= Math.PI * 2;
+                while (diff < -Math.PI) diff += Math.PI * 2;
+                changes.push(diff);
+            }
+
+            // Count direction reversals (sign changes in consecutive changes)
+            let reversals = 0;
+            for (let i = 1; i < changes.length; i++) {
+                // If signs are opposite, it's a reversal
+                if ((changes[i] > 0 && changes[i-1] < 0) || (changes[i] < 0 && changes[i-1] > 0)) {
+                    reversals++;
+                }
+            }
+
+            // If we have N+ reversals in recent frames, that's oscillation
+            // But only trigger if not in cooldown period
+            const now = Date.now();
+            if (reversals >= PHYSICS_CONFIG.OSCILLATION_REVERSAL_THRESHOLD &&
+                !this.isEscaping && now > this.escapeCooldownEndTime) {
+                // Trigger escape maneuver
+                this.triggerEscapeManeuver(randomFunc);
+
+                // Clear history after triggering escape
+                this.headingHistory = [];
+            }
+        }
+
+        this.previousHeading = currentHeading;
 
         // Reset acceleration to zero for next frame
         this.acceleration.set(0, 0, 0);
