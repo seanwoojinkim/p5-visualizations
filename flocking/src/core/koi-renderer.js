@@ -194,13 +194,26 @@ export class KoiRenderer {
      * Calculate body segment positions with swimming wave motion
      */
     calculateSegments(numSegments, waveTime, sizeScale, lengthMultiplier, shapeParams = DEFAULT_SHAPE_PARAMS, waveAmplitudeScale = 1.0) {
+        // Pre-compute wave values once per frame (performance optimization)
+        // Eliminates ~800 Math.sin() calls per frame by caching when time changes
+        if (waveTime !== this.lastWaveTime || numSegments !== this.lastNumSegments) {
+            this.waveCache = [];
+            for (let i = 0; i < numSegments; i++) {
+                const t = i / numSegments;
+                this.waveCache[i] = Math.sin(waveTime - t * ANIMATION_CONFIG.wave.phaseGradient);
+            }
+            this.lastWaveTime = waveTime;
+            this.lastNumSegments = numSegments;
+        }
+
         const segments = [];
 
         for (let i = 0; i < numSegments; i++) {
             const t = i / numSegments;
             const x = this.lerp(7, -9, t) * sizeScale * lengthMultiplier;
             // Wave amplitude uses separate scaling to avoid exaggerated motion when rendering at larger sizes
-            const y = Math.sin(waveTime - t * ANIMATION_CONFIG.wave.phaseGradient) *
+            // Use cached wave value instead of calling Math.sin() (performance optimization)
+            const y = this.waveCache[i] *
                       ANIMATION_CONFIG.wave.amplitude * waveAmplitudeScale *
                       (1 - t * ANIMATION_CONFIG.wave.dampening);
 
