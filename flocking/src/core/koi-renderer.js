@@ -262,7 +262,7 @@ export class KoiRenderer {
         this.drawTail(context, segmentPositions, shapeParams, waveTime, finalSizeScale, tailLength, hue, saturation, brightness, svgVertices.tail, waveAmplitudeScale);
 
         // Use SVG body if vertices provided, otherwise use procedural body
-        if (svgVertices.body && svgVertices.body.length > 0) {
+        if (svgVertices.body && Array.isArray(svgVertices.body) && svgVertices.body.length > 0) {
             this.drawBodyFromSVG(context, segmentPositions, svgVertices.body, shapeParams, finalSizeScale, hue, saturation, brightness);
         } else {
             this.drawBody(context, segmentPositions, shapeParams, finalSizeScale, hue, saturation, brightness);
@@ -360,6 +360,11 @@ export class KoiRenderer {
      * @param {string} [mirror='none'] - Mirror type ('none', 'horizontal', 'vertical')
      */
     drawFinFromSVG(context, segmentPos, svgVertices, yOffset, baseAngle, waveTime, rotationAmplitude, sway, sizeScale, hue, saturation, brightness, mirror = 'none') {
+        // Guard: Validate SVG vertices
+        if (!svgVertices || !Array.isArray(svgVertices) || svgVertices.length === 0) {
+            return; // Cannot draw fin without vertices
+        }
+
         // Calculate pivot at attachment edge (left edge center)
         // This ensures fins rotate naturally from their body connection point
         const xs = svgVertices.map(v => v.x);
@@ -408,6 +413,11 @@ export class KoiRenderer {
      * @param {Array<{x,y}>} [svgVertices.ventralFin] - Ventral fin vertices
      */
     drawFins(context, segmentPositions, shapeParams, waveTime, sizeScale, hue, saturation, brightness, svgVertices = {}) {
+        // Guard: Validate segment positions
+        if (!segmentPositions || !Array.isArray(segmentPositions) || segmentPositions.length === 0) {
+            return; // Cannot draw fins without segments
+        }
+
         // Check if we should use SVG rendering for any fins
         const useSVG = svgVertices.pectoralFin || svgVertices.dorsalFin || svgVertices.ventralFin;
 
@@ -417,6 +427,8 @@ export class KoiRenderer {
 
             // Pectoral fins (left and right)
             const finPos = segmentPositions[shapeParams.pectoralPos];
+            if (!finPos) return; // Guard: ensure pectoral position segment exists
+
             if (svgVertices.pectoralFin) {
                 // Top pectoral fin (left)
                 this.drawFinFromSVG(
@@ -482,6 +494,8 @@ export class KoiRenderer {
 
             // Ventral fins (top and bottom)
             const ventralPos = segmentPositions[shapeParams.ventralPos];
+            if (!ventralPos) return; // Guard: ensure ventral position segment exists
+
             if (svgVertices.ventralFin) {
                 // Top ventral fin
                 this.drawFinFromSVG(
@@ -520,6 +534,7 @@ export class KoiRenderer {
 
         // Pectoral fins (left and right)
         const finPos = segmentPositions[shapeParams.pectoralPos];
+        if (!finPos) return; // Guard: ensure pectoral position segment exists
 
         // Top pectoral fin (left)
         for (let layer = 0; layer < layers; layer++) {
@@ -549,6 +564,8 @@ export class KoiRenderer {
 
         // Dorsal fin
         const dorsalPos = segmentPositions[shapeParams.dorsalPos];
+        if (!dorsalPos) return; // Guard: ensure dorsal position segment exists
+
         for (let layer = 0; layer < layers; layer++) {
             const offset = this.useSumieStyle ? (layer - 0.5) * PROCEDURAL_RENDERING.fins.dorsal.LAYER_OFFSET : 0;
             const opacity = this.useSumieStyle ? (layer === 0 ? PROCEDURAL_RENDERING.fins.dorsal.OPACITY_PRIMARY : PROCEDURAL_RENDERING.fins.dorsal.OPACITY_SECONDARY) : PROCEDURAL_RENDERING.fins.dorsal.OPACITY_NORMAL;
@@ -569,6 +586,7 @@ export class KoiRenderer {
 
         // Ventral fins (top and bottom)
         const ventralPos = segmentPositions[shapeParams.ventralPos];
+        if (!ventralPos) return; // Guard: ensure ventral position segment exists
 
         // Top ventral fin
         for (let layer = 0; layer < layers; layer++) {
@@ -612,7 +630,16 @@ export class KoiRenderer {
      * @param {number} brightness - HSB brightness
      */
     drawTailFromSVG(context, segmentPositions, svgVertices, shapeParams, waveTime, sizeScale, tailLength, hue, saturation, brightness, waveAmplitudeScale = 1.0) {
+        // Guard: Validate inputs
+        if (!svgVertices || !Array.isArray(svgVertices) || svgVertices.length === 0) {
+            return; // Cannot draw tail without vertices
+        }
+        if (!segmentPositions || !Array.isArray(segmentPositions) || segmentPositions.length === 0) {
+            return; // Cannot position tail without segments
+        }
+
         const tailBase = segmentPositions[segmentPositions.length - 1];
+        if (!tailBase) return; // Guard: ensure tail base segment exists
         const tailStartX = tailBase.x + shapeParams.tailStartX * sizeScale;
 
         // Calculate tail's rightmost edge (connection point to body)
@@ -664,8 +691,13 @@ export class KoiRenderer {
      * Uses SVG if vertices provided, otherwise uses procedural rendering
      */
     drawTail(context, segmentPositions, shapeParams, waveTime, sizeScale, tailLength, hue, saturation, brightness, svgVertices = null, waveAmplitudeScale = 1.0) {
+        // Guard: Validate segment positions
+        if (!segmentPositions || !Array.isArray(segmentPositions) || segmentPositions.length === 0) {
+            return; // Cannot draw tail without segments
+        }
+
         // Use SVG if provided, otherwise procedural
-        if (svgVertices && svgVertices.length > 0) {
+        if (svgVertices && Array.isArray(svgVertices) && svgVertices.length > 0) {
             this.drawTailFromSVG(context, segmentPositions, svgVertices, shapeParams, waveTime, sizeScale, tailLength, hue, saturation, brightness, waveAmplitudeScale);
             return;
         }
@@ -743,18 +775,32 @@ export class KoiRenderer {
      * @returns {Array<{x, y}>} - Deformed vertices
      */
     applyWaveDeformation(vertices, params) {
+        // Guard: Validate inputs
+        if (!vertices || !Array.isArray(vertices) || vertices.length === 0) {
+            return vertices || []; // Return empty array if null/undefined
+        }
+        if (!params || !params.segmentPositions || !Array.isArray(params.segmentPositions) || params.segmentPositions.length === 0) {
+            return vertices; // No deformation possible, return original
+        }
+
         const { segmentPositions, numSegments } = params;
 
         // Calculate X bounds once for all vertices (optimized - no intermediate array)
         let minX = Infinity;
         let maxX = -Infinity;
         for (let i = 0; i < vertices.length; i++) {
+            if (!vertices[i]) continue; // Skip null vertices
             if (vertices[i].x < minX) minX = vertices[i].x;
             if (vertices[i].x > maxX) maxX = vertices[i].x;
         }
         const range = maxX - minX;
 
         return vertices.map(v => {
+            // Guard: Skip null vertices
+            if (!v || v.x === undefined || v.y === undefined) {
+                return v || { x: 0, y: 0 };
+            }
+
             // Normalize vertex X to 0-1 range, flipped so rightmost = 0, leftmost = 1
             const flippedT = range === 0 ? 0 : (maxX - v.x) / range;
 
@@ -797,6 +843,14 @@ export class KoiRenderer {
      * @returns {Array<{x, y}>} - Deformed vertices
      */
     applyFlutterDeformation(vertices, params) {
+        // Guard: Validate inputs
+        if (!vertices || !Array.isArray(vertices) || vertices.length === 0) {
+            return vertices || [];
+        }
+        if (!params) {
+            return vertices;
+        }
+
         const {
             waveTime,
             sizeScale,
@@ -811,6 +865,7 @@ export class KoiRenderer {
         let minX = Infinity;
         let maxX = -Infinity;
         for (let i = 0; i < vertices.length; i++) {
+            if (!vertices[i]) continue; // Skip null vertices
             if (vertices[i].x < minX) minX = vertices[i].x;
             if (vertices[i].x > maxX) maxX = vertices[i].x;
         }
@@ -819,6 +874,11 @@ export class KoiRenderer {
         if (rangeX === 0) return vertices; // Prevent division by zero
 
         return vertices.map(v => {
+            // Guard: Skip null vertices
+            if (!v || v.x === undefined || v.y === undefined) {
+                return v || { x: 0, y: 0 };
+            }
+
             const t = (v.x - minX) / rangeX; // 0 at base, 1 at tip
 
             // Phase increases toward tip (creates traveling wave)
@@ -852,6 +912,14 @@ export class KoiRenderer {
      * @returns {Array<{x, y}>} - Deformed vertices
      */
     applyRotationDeformation(vertices, params) {
+        // Guard: Validate inputs
+        if (!vertices || !Array.isArray(vertices) || vertices.length === 0) {
+            return vertices || [];
+        }
+        if (!params) {
+            return vertices;
+        }
+
         const {
             waveTime,
             rotationAmplitude = 0,
@@ -868,6 +936,11 @@ export class KoiRenderer {
         const sin = Math.sin(rotationAngle);
 
         return vertices.map(v => {
+            // Guard: Skip null vertices
+            if (!v || v.x === undefined || v.y === undefined) {
+                return v || { x: 0, y: 0 };
+            }
+
             const dx = v.x - pivot.x;
             const dy = v.y - pivot.y;
 
@@ -931,10 +1004,16 @@ export class KoiRenderer {
      * @returns {number} - Segment index (0 to numSegments-1)
      */
     mapVertexToSegment(vertexX, svgVertices, numSegments) {
+        // Guard: Validate inputs
+        if (!svgVertices || !Array.isArray(svgVertices) || svgVertices.length === 0) {
+            return 0;
+        }
+
         // Find X bounds of SVG vertices (optimized - no intermediate array)
         let minX = Infinity;
         let maxX = -Infinity;
         for (let i = 0; i < svgVertices.length; i++) {
+            if (!svgVertices[i]) continue; // Skip null vertices
             if (svgVertices[i].x < minX) minX = svgVertices[i].x;
             if (svgVertices[i].x > maxX) maxX = svgVertices[i].x;
         }
@@ -1047,6 +1126,14 @@ export class KoiRenderer {
      * @param {number} brightness - HSB brightness
      */
     drawBodyFromSVG(context, segmentPositions, svgVertices, shapeParams, sizeScale, hue, saturation, brightness) {
+        // Guard: Validate inputs
+        if (!svgVertices || !Array.isArray(svgVertices) || svgVertices.length === 0) {
+            return; // Cannot draw body without vertices
+        }
+        if (!segmentPositions || !Array.isArray(segmentPositions) || segmentPositions.length === 0) {
+            return; // Cannot deform body without segments
+        }
+
         this.drawSVGShape(context, svgVertices, {
             deformationType: 'wave',
             deformationParams: {
@@ -1071,6 +1158,11 @@ export class KoiRenderer {
      * Draw main body outline
      */
     drawBody(context, segmentPositions, shapeParams, sizeScale, hue, saturation, brightness) {
+        // Guard: Validate segment positions
+        if (!segmentPositions || !Array.isArray(segmentPositions) || segmentPositions.length === 0) {
+            return; // Cannot draw body without segments
+        }
+
         // For sumi-e style, draw multiple semi-transparent layers with slight variations
         // This creates soft, organic brush-like edges
         if (this.useSumieStyle) {
@@ -1168,13 +1260,19 @@ export class KoiRenderer {
      * Uses the same clipping as spots for consistency
      */
     applyBodyTexture(context, segmentPositions, shapeParams, sizeScale, hue, saturation, brightness, svgVertices) {
-        if (!this.brushTextures || !this.brushTextures.isReady) {
+        // Guard: Check brush textures system is available
+        if (!this.brushTextures || !this.brushTextures.isReady || typeof this.brushTextures.getTintedBody !== 'function') {
             return; // No textures available
         }
 
+        // Guard: Check segment positions array is valid
+        if (!segmentPositions || !Array.isArray(segmentPositions) || segmentPositions.length === 0) {
+            return; // Invalid segment data
+        }
+
         const bodyTexture = this.brushTextures.get('body');
-        if (!bodyTexture) {
-            return; // No body texture available
+        if (!bodyTexture || !bodyTexture.width || !bodyTexture.height) {
+            return; // Invalid body texture
         }
 
         // Calculate body bounds
@@ -1221,19 +1319,28 @@ export class KoiRenderer {
      * Create a clipping path for body and head to constrain spots
      */
     clipToBodyAndHead(context, segmentPositions, svgVertices, shapeParams, sizeScale) {
+        // Guard: Validate segment positions
+        if (!segmentPositions || !Array.isArray(segmentPositions) || segmentPositions.length === 0) {
+            return; // Cannot create clip without segments
+        }
+
         const ctx = context.drawingContext;
+        if (!ctx) return; // Guard: ensure drawing context exists
+
         ctx.save();
         ctx.beginPath();
 
         // Create body outline path
-        if (svgVertices.body && svgVertices.body.length > 0) {
+        if (svgVertices.body && Array.isArray(svgVertices.body) && svgVertices.body.length > 0) {
             // Use SVG body outline
             const bodyOutline = this.calculateSVGOutline(svgVertices.body, segmentPositions, sizeScale);
-            ctx.moveTo(bodyOutline[0].x, bodyOutline[0].y);
-            for (let i = 1; i < bodyOutline.length; i++) {
-                ctx.lineTo(bodyOutline[i].x, bodyOutline[i].y);
+            if (bodyOutline && bodyOutline.length > 0) {
+                ctx.moveTo(bodyOutline[0].x, bodyOutline[0].y);
+                for (let i = 1; i < bodyOutline.length; i++) {
+                    ctx.lineTo(bodyOutline[i].x, bodyOutline[i].y);
+                }
+                ctx.closePath();
             }
-            ctx.closePath();
         } else {
             // Use procedural body outline
             // Top edge
@@ -1256,8 +1363,10 @@ export class KoiRenderer {
         }
 
         // Add head outline to clip path
-        if (svgVertices.head && svgVertices.head.length > 0) {
+        if (svgVertices.head && Array.isArray(svgVertices.head) && svgVertices.head.length > 0) {
             const headPos = segmentPositions[0];
+            if (!headPos) return; // Guard: ensure head segment exists
+
             const headOffsetX = shapeParams.headX * sizeScale;
 
             ctx.moveTo(headPos.x + headOffsetX + svgVertices.head[0].x * sizeScale,
@@ -1291,6 +1400,14 @@ export class KoiRenderer {
      * Calculate SVG outline vertices for clipping
      */
     calculateSVGOutline(svgVertices, segmentPositions, sizeScale) {
+        // Guard: Validate inputs
+        if (!svgVertices || !Array.isArray(svgVertices) || svgVertices.length === 0) {
+            return [];
+        }
+        if (!segmentPositions || !Array.isArray(segmentPositions) || segmentPositions.length === 0) {
+            return [];
+        }
+
         // Apply the same wave deformation as drawBodyFromSVG to match animated body
         const deformedVertices = this.applyWaveDeformation(svgVertices, {
             segmentPositions,
@@ -1309,10 +1426,18 @@ export class KoiRenderer {
      * @param {number} bodyBrightness - Body color brightness (0-100) for adaptive blend mode
      */
     drawSpots(context, segmentPositions, spots, sizeScale, boidSeed = 0, koiAngle = 0, bodyBrightness = 50) {
+        // Guard: Validate input arrays
+        if (!segmentPositions || !Array.isArray(segmentPositions) || segmentPositions.length === 0) {
+            return; // No segments to draw on
+        }
+        if (!spots || !Array.isArray(spots)) {
+            return; // No spots to draw
+        }
+
         if (!this.brushTextures || !this.brushTextures.isReady) {
             // Fallback to simple ellipses if textures not available
             for (let spot of spots) {
-                if (spot.segment >= segmentPositions.length) continue;
+                if (!spot || spot.segment >= segmentPositions.length) continue;
                 const seg = segmentPositions[spot.segment];
                 context.fill(spot.color.h, spot.color.s, spot.color.b, 1.0);
                 const spotSize = spot.size * sizeScale * BRUSH_TEXTURE_CONFIG.SPOT_SIZE_MULTIPLIER;
@@ -1332,7 +1457,7 @@ export class KoiRenderer {
         if (spotCount === 0) {
             // Fallback to ellipses if no spot textures available
             for (let spot of spots) {
-                if (spot.segment >= segmentPositions.length) continue;
+                if (!spot || spot.segment >= segmentPositions.length) continue;
                 const seg = segmentPositions[spot.segment];
                 context.fill(spot.color.h, spot.color.s, spot.color.b, 1.0);
                 const spotSize = spot.size * sizeScale * BRUSH_TEXTURE_CONFIG.SPOT_SIZE_MULTIPLIER;
@@ -1348,9 +1473,10 @@ export class KoiRenderer {
 
         for (let spotIndex = 0; spotIndex < spots.length; spotIndex++) {
             const spot = spots[spotIndex];
-            if (spot.segment >= segmentPositions.length) continue;
+            if (!spot || spot.segment >= segmentPositions.length) continue;
 
             const seg = segmentPositions[spot.segment];
+            if (!seg) continue; // Guard: ensure segment exists
             // Scale up spot size now that clipping keeps them within body boundaries
             const spotSize = spot.size * sizeScale * BRUSH_TEXTURE_CONFIG.SPOT_SIZE_MULTIPLIER;
             const spotX = seg.x;
@@ -1410,6 +1536,14 @@ export class KoiRenderer {
      * @param {number} brightness - HSB brightness
      */
     drawHeadFromSVG(context, headSegment, svgVertices, shapeParams, sizeScale, hue, saturation, brightness) {
+        // Guard: Validate inputs
+        if (!svgVertices || !Array.isArray(svgVertices) || svgVertices.length === 0) {
+            return; // Cannot draw head without vertices
+        }
+        if (!headSegment) {
+            return; // Cannot position head without segment
+        }
+
         const headX = headSegment.x + shapeParams.headX * sizeScale;
         const headY = headSegment.y;
 
@@ -1463,8 +1597,13 @@ export class KoiRenderer {
      * @param {Array<{x,y}>} [svgVertices=null] - Optional SVG vertices for head
      */
     drawHead(context, headSegment, shapeParams, sizeScale, hue, saturation, brightness, svgVertices = null) {
+        // Guard: Validate head segment
+        if (!headSegment) {
+            return; // Cannot draw head without segment
+        }
+
         // Use SVG if provided, otherwise use procedural rendering
-        if (svgVertices && svgVertices.length > 0) {
+        if (svgVertices && Array.isArray(svgVertices) && svgVertices.length > 0) {
             this.drawHeadFromSVG(context, headSegment, svgVertices, shapeParams, sizeScale, hue, saturation, brightness);
             return;
         }
