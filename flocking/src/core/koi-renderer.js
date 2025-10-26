@@ -187,7 +187,6 @@ export class KoiRenderer {
 
         // Restore graphics state
         context.pop();
-        context.colorMode(context.RGB || 'RGB');
     }
 
     /**
