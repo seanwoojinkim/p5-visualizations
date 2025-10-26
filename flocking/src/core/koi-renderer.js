@@ -644,10 +644,13 @@ export class KoiRenderer {
     applyWaveDeformation(vertices, params) {
         const { segmentPositions, numSegments } = params;
 
-        // Calculate X bounds once for all vertices (optimization)
-        const xs = vertices.map(v => v.x);
-        const minX = Math.min(...xs);
-        const maxX = Math.max(...xs);
+        // Calculate X bounds once for all vertices (optimized - no intermediate array)
+        let minX = Infinity;
+        let maxX = -Infinity;
+        for (let i = 0; i < vertices.length; i++) {
+            if (vertices[i].x < minX) minX = vertices[i].x;
+            if (vertices[i].x > maxX) maxX = vertices[i].x;
+        }
         const range = maxX - minX;
 
         return vertices.map(v => {
@@ -703,10 +706,13 @@ export class KoiRenderer {
             amplitudeScale = 3
         } = params;
 
-        // Find X bounds for normalization (0 to 1 from base to tip)
-        const xs = vertices.map(v => v.x);
-        const minX = Math.min(...xs);
-        const maxX = Math.max(...xs);
+        // Find X bounds for normalization (0 to 1 from base to tip) - optimized
+        let minX = Infinity;
+        let maxX = -Infinity;
+        for (let i = 0; i < vertices.length; i++) {
+            if (vertices[i].x < minX) minX = vertices[i].x;
+            if (vertices[i].x > maxX) maxX = vertices[i].x;
+        }
         const rangeX = maxX - minX;
 
         if (rangeX === 0) return vertices; // Prevent division by zero
@@ -824,10 +830,13 @@ export class KoiRenderer {
      * @returns {number} - Segment index (0 to numSegments-1)
      */
     mapVertexToSegment(vertexX, svgVertices, numSegments) {
-        // Find X bounds of SVG vertices
-        const xs = svgVertices.map(v => v.x);
-        const minX = Math.min(...xs);
-        const maxX = Math.max(...xs);
+        // Find X bounds of SVG vertices (optimized - no intermediate array)
+        let minX = Infinity;
+        let maxX = -Infinity;
+        for (let i = 0; i < svgVertices.length; i++) {
+            if (svgVertices[i].x < minX) minX = svgVertices[i].x;
+            if (svgVertices[i].x > maxX) maxX = svgVertices[i].x;
+        }
 
         // Normalize vertex X to 0-1 range
         // For koi body: positive X = head/front, negative X = tail/back
@@ -1073,7 +1082,14 @@ export class KoiRenderer {
 
         // Body extends from head to tail
         const bodyWidth = Math.abs(firstSeg.x - lastSeg.x);
-        const bodyHeight = Math.max(...segmentPositions.map(s => s.w));
+
+        // Find maximum segment width (optimized - no intermediate array)
+        let bodyHeight = 0;
+        for (let i = 0; i < segmentPositions.length; i++) {
+            if (segmentPositions[i].w > bodyHeight) {
+                bodyHeight = segmentPositions[i].w;
+            }
+        }
 
         // Center position (middle of body)
         const centerX = (firstSeg.x + lastSeg.x) / 2;
