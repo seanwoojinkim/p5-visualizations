@@ -430,3 +430,31 @@ window.windowResized = function() {
     resizeCanvas(windowWidth, windowHeight);
     pixelBuffer.resize(width, height);
 };
+
+// Hot Module Replacement (HMR) cleanup
+// This prevents memory leaks and performance degradation on hot reload
+if (import.meta.hot) {
+    import.meta.hot.dispose(() => {
+        console.log('🔄 HMR: Cleaning up simulation-app resources...');
+
+        // Clear tint cache to free p5.Graphics memory (~50MB with 200 cached textures)
+        if (brushTextures) {
+            brushTextures.clearTintCache();
+        }
+
+        // Remove pixel buffer graphics
+        if (pixelBuffer) {
+            const pg = pixelBuffer.getContext();
+            if (pg && pg.remove) {
+                pg.remove();
+            }
+        }
+
+        // Clear p5.js instance (will be recreated on reload)
+        if (window.remove) {
+            window.remove();
+        }
+
+        console.log('✓ HMR: Resources cleaned up');
+    });
+}
