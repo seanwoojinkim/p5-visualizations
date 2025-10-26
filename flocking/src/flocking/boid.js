@@ -33,7 +33,7 @@ export class Boid {
         // Debug tracking for oscillation (rapid back-and-forth direction changes)
         this.previousHeading = this.velocity.heading();
         this.headingHistory = []; // Track last PHYSICS_CONFIG.OSCILLATION_HISTORY_LENGTH headings
-        this.debugOscillation = false; // Set to true to enable oscillation debug logging
+        this.debugOscillation = true; // Set to false to disable debug logging
 
         // Derivative damping - track heading velocity for PID D-term
         this.headingVelocity = 0;
