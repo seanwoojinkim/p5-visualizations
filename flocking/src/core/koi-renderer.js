@@ -17,6 +17,7 @@ const BRUSH_TEXTURE_CONFIG = {
     SPOT_SIZE_VARIATION_MIN: 0.8,       // Minimum random size variation
     SPOT_SIZE_VARIATION_MAX: 1.2,       // Maximum random size variation
     SPOT_ROTATION_VARIATION: 30,        // Degrees of random rotation (±)
+    SPOT_HEIGHT_RATIO: 0.8,             // Height-to-width ratio for spots (oval shape)
 
     // Adaptive opacity based on body brightness
     DARK_FISH_THRESHOLD: 50,            // Brightness threshold for dark fish
@@ -26,6 +27,104 @@ const BRUSH_TEXTURE_CONFIG = {
     // Body texture
     BODY_TEXTURE_ALPHA: 8,              // Opacity for body brush texture
     BODY_TEXTURE_SCALE: 1.5,            // Scale multiplier for body texture
+};
+
+/**
+ * Procedural Rendering Constants (when SVG not available)
+ * These values define the appearance of procedurally-drawn body parts
+ */
+const PROCEDURAL_RENDERING = {
+    // Body shape
+    body: {
+        WIDTH_MULTIPLIER: 0.48,          // Half-width multiplier for body segments (0.48 = ~96% of segment width)
+        ASYMMETRY_FACTOR: 0.15,          // Asymmetry influence on top/bottom width
+        SEGMENT_LINE_WEIGHT: 0.3,        // Stroke weight for body segment lines
+        SEGMENT_LINE_ALPHA: 0.4,         // Opacity for body segment lines
+        BRIGHTNESS_OFFSET: -2,           // Brightness offset from base color
+        SATURATION_BOOST: 10,            // Saturation boost for segment lines
+        BRIGHTNESS_BOOST: -25,           // Brightness adjustment for segment lines
+    },
+
+    // Fin shape and animation
+    fins: {
+        ROTATION_FREQUENCY: 1.2,         // Frequency multiplier for fin rotation animation
+        SWAY_PHASE_OFFSET: -0.5,         // Phase offset for fin sway animation
+        SWAY_AMPLITUDE: 0.8,             // Amplitude for pectoral fin sway
+        OPACITY_NORMAL: 0.7,             // Opacity for normal (non-sumi-e) fins
+        OPACITY_SUMIE: 0.6,              // Base opacity for sumi-e style fins
+        SATURATION_BOOST: 8,             // Saturation boost for fins
+        BRIGHTNESS_OFFSET: -15,          // Brightness offset for fins
+
+        // Pectoral fin
+        pectoral: {
+            ROTATION_AMPLITUDE: 0.15,    // Rotation amplitude in radians
+            CENTER_OFFSET: 2.25,         // X offset from segment center
+            WIDTH: 4.5,                  // Fin width
+            HEIGHT: 2,                   // Fin height
+        },
+
+        // Dorsal fin
+        dorsal: {
+            ROTATION_ANGLE: -0.2,        // Static rotation angle in radians
+            LAYER_OFFSET: 0.15,          // Offset between sumi-e layers
+            OPACITY_PRIMARY: 0.6,        // Primary layer opacity (sumi-e)
+            OPACITY_SECONDARY: 0.3,      // Secondary layer opacity (sumi-e)
+            OPACITY_NORMAL: 0.75,        // Normal rendering opacity
+            // Procedural fin vertex coordinates (when SVG not available)
+            VERTEX_Y_BASE: 0,            // Y coordinate at base
+            VERTEX_Y_TIP_1: -2,          // Y coordinate of first tip vertex
+            VERTEX_Y_TIP_2: -2.5,        // Y coordinate of highest tip vertex
+            VERTEX_Y_TIP_3: -1.5,        // Y coordinate of third tip vertex
+            VERTEX_X_LEFT: -1,           // X coordinate of left vertex
+            VERTEX_X_MID: 1,             // X coordinate of middle vertex
+            VERTEX_X_RIGHT: 2,           // X coordinate of right vertices
+        },
+
+        // Ventral fin
+        ventral: {
+            ROTATION_AMPLITUDE: 0.1,     // Rotation amplitude in radians
+            CENTER_OFFSET: 1.5,          // X offset from segment center
+            WIDTH: 3,                    // Fin width
+            HEIGHT: 1.5,                 // Fin height
+        }
+    },
+
+    // Tail shape and animation
+    tail: {
+        LENGTH_MULTIPLIER: 6,            // Base tail length multiplier (tailLength parameter scales this)
+        SWAY_PHASE_OFFSET: -2.5,         // Phase offset for tail flutter wave
+        SWAY_PHASE_GRADIENT: -2,         // Phase change per unit distance (creates traveling wave)
+        SWAY_AMPLITUDE: 3,               // Flutter amplitude multiplier
+        SWAY_AMPLITUDE_START: 0.5,       // Flutter amplitude at base
+        SWAY_AMPLITUDE_END: 1.0,         // Flutter amplitude at tip
+        WAVE_CONTINUATION: 0.5,          // How much to continue body wave into tail (t factor)
+        SATURATION_BOOST: 5,             // Saturation boost for tail
+        BRIGHTNESS_OFFSET: -12,          // Brightness offset for tail
+        OPACITY_PRIMARY: 0.7,            // Primary layer opacity (sumi-e)
+        OPACITY_SECONDARY: 0.25,         // Secondary layer opacity (sumi-e)
+        LAYER_OFFSET: 0.4,               // Offset between sumi-e layers
+    },
+
+    // Head shape
+    head: {
+        BRIGHTNESS_OFFSET: 2,            // Brightness offset from body (slightly brighter)
+        OPACITY_PRIMARY: 0.8,            // Primary layer opacity (sumi-e)
+        OPACITY_SECONDARY: 0.3,          // Secondary layer opacity (sumi-e)
+        LAYER_OFFSET: 0.25,              // Position offset between layers
+        SIZE_VARIATION: 0.08,            // Size variation per layer
+    },
+
+    // Sumi-e layering
+    sumie: {
+        LAYER_OFFSET_BODY: 0.3,          // Position offset for body layers
+        LAYER_OFFSET_FIN: 0.2,           // Position offset for fin layers
+        OPACITY_PRIMARY: 0.7,            // Primary layer opacity for body
+        OPACITY_SECONDARY: 0.3,          // Secondary layer opacity for body
+        OPACITY_FIN_PRIMARY: 0.5,        // Primary layer opacity for fins
+        OPACITY_FIN_SECONDARY: 0.25,     // Secondary layer opacity for fins
+        LAYER_OFFSET_SVG: 0.3,           // Position offset for SVG shape layers
+        OPACITY_SVG_SECONDARY: 0.4,      // Secondary layer opacity for SVG shapes
+    }
 };
 
 export class KoiRenderer {
@@ -415,8 +514,8 @@ export class KoiRenderer {
         }
 
         // PROCEDURAL FIN RENDERING (fallback)
-        const finSway = Math.sin(waveTime - 0.5) * 0.8;
-        const finOpacity = this.useSumieStyle ? 0.6 : 0.7;
+        const finSway = Math.sin(waveTime + PROCEDURAL_RENDERING.fins.SWAY_PHASE_OFFSET) * PROCEDURAL_RENDERING.fins.SWAY_AMPLITUDE;
+        const finOpacity = this.useSumieStyle ? PROCEDURAL_RENDERING.fins.OPACITY_SUMIE : PROCEDURAL_RENDERING.fins.OPACITY_NORMAL;
         const layers = this.useSumieStyle ? 2 : 1; // Lighter layering for fins
 
         // Pectoral fins (left and right)
@@ -424,46 +523,46 @@ export class KoiRenderer {
 
         // Top pectoral fin (left)
         for (let layer = 0; layer < layers; layer++) {
-            const offset = this.useSumieStyle ? (layer - 0.5) * 0.2 : 0;
-            const opacity = this.useSumieStyle ? (layer === 0 ? 0.5 : 0.25) : finOpacity;
+            const offset = this.useSumieStyle ? (layer - 0.5) * PROCEDURAL_RENDERING.sumie.LAYER_OFFSET_FIN : 0;
+            const opacity = this.useSumieStyle ? (layer === 0 ? PROCEDURAL_RENDERING.sumie.OPACITY_FIN_PRIMARY : PROCEDURAL_RENDERING.sumie.OPACITY_FIN_SECONDARY) : finOpacity;
 
-            context.fill(hue, saturation + 8, brightness - 15, opacity);
+            context.fill(hue, saturation + PROCEDURAL_RENDERING.fins.SATURATION_BOOST, brightness + PROCEDURAL_RENDERING.fins.BRIGHTNESS_OFFSET, opacity);
             context.push();
             context.translate(finPos.x, finPos.y + shapeParams.pectoralYTop * sizeScale + finSway);
-            context.rotate(shapeParams.pectoralAngleTop + Math.sin(waveTime * 1.2) * 0.15);
-            context.ellipse(2.25 * sizeScale + offset, 0, 4.5 * sizeScale, 2 * sizeScale);
+            context.rotate(shapeParams.pectoralAngleTop + Math.sin(waveTime * PROCEDURAL_RENDERING.fins.ROTATION_FREQUENCY) * PROCEDURAL_RENDERING.fins.pectoral.ROTATION_AMPLITUDE);
+            context.ellipse(PROCEDURAL_RENDERING.fins.pectoral.CENTER_OFFSET * sizeScale + offset, 0, PROCEDURAL_RENDERING.fins.pectoral.WIDTH * sizeScale, PROCEDURAL_RENDERING.fins.pectoral.HEIGHT * sizeScale);
             context.pop();
         }
 
         // Bottom pectoral fin (right)
         for (let layer = 0; layer < layers; layer++) {
-            const offset = this.useSumieStyle ? (layer - 0.5) * 0.2 : 0;
-            const opacity = this.useSumieStyle ? (layer === 0 ? 0.5 : 0.25) : finOpacity;
+            const offset = this.useSumieStyle ? (layer - 0.5) * PROCEDURAL_RENDERING.sumie.LAYER_OFFSET_FIN : 0;
+            const opacity = this.useSumieStyle ? (layer === 0 ? PROCEDURAL_RENDERING.sumie.OPACITY_FIN_PRIMARY : PROCEDURAL_RENDERING.sumie.OPACITY_FIN_SECONDARY) : finOpacity;
 
-            context.fill(hue, saturation + 8, brightness - 15, opacity);
+            context.fill(hue, saturation + PROCEDURAL_RENDERING.fins.SATURATION_BOOST, brightness + PROCEDURAL_RENDERING.fins.BRIGHTNESS_OFFSET, opacity);
             context.push();
             context.translate(finPos.x, finPos.y + shapeParams.pectoralYBottom * sizeScale - finSway);
-            context.rotate(shapeParams.pectoralAngleBottom - Math.sin(waveTime * 1.2) * 0.15);
-            context.ellipse(2.25 * sizeScale + offset, 0, 4.5 * sizeScale, 2 * sizeScale);
+            context.rotate(shapeParams.pectoralAngleBottom - Math.sin(waveTime * PROCEDURAL_RENDERING.fins.ROTATION_FREQUENCY) * PROCEDURAL_RENDERING.fins.pectoral.ROTATION_AMPLITUDE);
+            context.ellipse(PROCEDURAL_RENDERING.fins.pectoral.CENTER_OFFSET * sizeScale + offset, 0, PROCEDURAL_RENDERING.fins.pectoral.WIDTH * sizeScale, PROCEDURAL_RENDERING.fins.pectoral.HEIGHT * sizeScale);
             context.pop();
         }
 
         // Dorsal fin
         const dorsalPos = segmentPositions[shapeParams.dorsalPos];
         for (let layer = 0; layer < layers; layer++) {
-            const offset = this.useSumieStyle ? (layer - 0.5) * 0.15 : 0;
-            const opacity = this.useSumieStyle ? (layer === 0 ? 0.6 : 0.3) : 0.75;
+            const offset = this.useSumieStyle ? (layer - 0.5) * PROCEDURAL_RENDERING.fins.dorsal.LAYER_OFFSET : 0;
+            const opacity = this.useSumieStyle ? (layer === 0 ? PROCEDURAL_RENDERING.fins.dorsal.OPACITY_PRIMARY : PROCEDURAL_RENDERING.fins.dorsal.OPACITY_SECONDARY) : PROCEDURAL_RENDERING.fins.dorsal.OPACITY_NORMAL;
 
-            context.fill(hue, saturation + 8, brightness - 15, opacity);
+            context.fill(hue, saturation + PROCEDURAL_RENDERING.fins.SATURATION_BOOST, brightness + PROCEDURAL_RENDERING.fins.BRIGHTNESS_OFFSET, opacity);
             context.push();
             context.translate(dorsalPos.x, dorsalPos.y + shapeParams.dorsalY * sizeScale);
-            context.rotate(-0.2);
+            context.rotate(PROCEDURAL_RENDERING.fins.dorsal.ROTATION_ANGLE);
             context.beginShape();
-            context.vertex(0, offset);
-            context.vertex(-1 * sizeScale, -2 * sizeScale + offset);
-            context.vertex(1 * sizeScale, -2.5 * sizeScale + offset);
-            context.vertex(2 * sizeScale, -1.5 * sizeScale + offset);
-            context.vertex(2 * sizeScale, offset);
+            context.vertex(PROCEDURAL_RENDERING.fins.dorsal.VERTEX_Y_BASE, offset);
+            context.vertex(PROCEDURAL_RENDERING.fins.dorsal.VERTEX_X_LEFT * sizeScale, PROCEDURAL_RENDERING.fins.dorsal.VERTEX_Y_TIP_1 * sizeScale + offset);
+            context.vertex(PROCEDURAL_RENDERING.fins.dorsal.VERTEX_X_MID * sizeScale, PROCEDURAL_RENDERING.fins.dorsal.VERTEX_Y_TIP_2 * sizeScale + offset);
+            context.vertex(PROCEDURAL_RENDERING.fins.dorsal.VERTEX_X_RIGHT * sizeScale, PROCEDURAL_RENDERING.fins.dorsal.VERTEX_Y_TIP_3 * sizeScale + offset);
+            context.vertex(PROCEDURAL_RENDERING.fins.dorsal.VERTEX_X_RIGHT * sizeScale, offset);
             context.endShape(context.CLOSE);
             context.pop();
         }
@@ -473,27 +572,27 @@ export class KoiRenderer {
 
         // Top ventral fin
         for (let layer = 0; layer < layers; layer++) {
-            const offset = this.useSumieStyle ? (layer - 0.5) * 0.2 : 0;
-            const opacity = this.useSumieStyle ? (layer === 0 ? 0.5 : 0.25) : finOpacity;
+            const offset = this.useSumieStyle ? (layer - 0.5) * PROCEDURAL_RENDERING.sumie.LAYER_OFFSET_FIN : 0;
+            const opacity = this.useSumieStyle ? (layer === 0 ? PROCEDURAL_RENDERING.sumie.OPACITY_FIN_PRIMARY : PROCEDURAL_RENDERING.sumie.OPACITY_FIN_SECONDARY) : finOpacity;
 
-            context.fill(hue, saturation + 8, brightness - 15, opacity);
+            context.fill(hue, saturation + PROCEDURAL_RENDERING.fins.SATURATION_BOOST, brightness + PROCEDURAL_RENDERING.fins.BRIGHTNESS_OFFSET, opacity);
             context.push();
             context.translate(ventralPos.x, ventralPos.y + shapeParams.ventralYTop * sizeScale);
-            context.rotate(shapeParams.ventralAngleTop + Math.sin(waveTime * 1.2) * 0.1);
-            context.ellipse(1.5 * sizeScale + offset, 0, 3 * sizeScale, 1.5 * sizeScale);
+            context.rotate(shapeParams.ventralAngleTop + Math.sin(waveTime * PROCEDURAL_RENDERING.fins.ROTATION_FREQUENCY) * PROCEDURAL_RENDERING.fins.ventral.ROTATION_AMPLITUDE);
+            context.ellipse(PROCEDURAL_RENDERING.fins.ventral.CENTER_OFFSET * sizeScale + offset, 0, PROCEDURAL_RENDERING.fins.ventral.WIDTH * sizeScale, PROCEDURAL_RENDERING.fins.ventral.HEIGHT * sizeScale);
             context.pop();
         }
 
         // Bottom ventral fin
         for (let layer = 0; layer < layers; layer++) {
-            const offset = this.useSumieStyle ? (layer - 0.5) * 0.2 : 0;
-            const opacity = this.useSumieStyle ? (layer === 0 ? 0.5 : 0.25) : finOpacity;
+            const offset = this.useSumieStyle ? (layer - 0.5) * PROCEDURAL_RENDERING.sumie.LAYER_OFFSET_FIN : 0;
+            const opacity = this.useSumieStyle ? (layer === 0 ? PROCEDURAL_RENDERING.sumie.OPACITY_FIN_PRIMARY : PROCEDURAL_RENDERING.sumie.OPACITY_FIN_SECONDARY) : finOpacity;
 
-            context.fill(hue, saturation + 8, brightness - 15, opacity);
+            context.fill(hue, saturation + PROCEDURAL_RENDERING.fins.SATURATION_BOOST, brightness + PROCEDURAL_RENDERING.fins.BRIGHTNESS_OFFSET, opacity);
             context.push();
             context.translate(ventralPos.x, ventralPos.y + shapeParams.ventralYBottom * sizeScale);
-            context.rotate(shapeParams.ventralAngleBottom - Math.sin(waveTime * 1.2) * 0.1);
-            context.ellipse(1.5 * sizeScale + offset, 0, 3 * sizeScale, 1.5 * sizeScale);
+            context.rotate(shapeParams.ventralAngleBottom - Math.sin(waveTime * PROCEDURAL_RENDERING.fins.ROTATION_FREQUENCY) * PROCEDURAL_RENDERING.fins.ventral.ROTATION_AMPLITUDE);
+            context.ellipse(PROCEDURAL_RENDERING.fins.ventral.CENTER_OFFSET * sizeScale + offset, 0, PROCEDURAL_RENDERING.fins.ventral.WIDTH * sizeScale, PROCEDURAL_RENDERING.fins.ventral.HEIGHT * sizeScale);
             context.pop();
         }
     }
@@ -532,10 +631,10 @@ export class KoiRenderer {
 
         for (let i = 0; i < numTailSegments; i++) {
             const t = i / numTailSegments;
-            const x = tailStartX - (t * tailLength * 6 * sizeScale);
+            const x = tailStartX - (t * tailLength * PROCEDURAL_RENDERING.tail.LENGTH_MULTIPLIER * sizeScale);
             // Continue the wave formula from body
             // But adjust t to continue from where body left off
-            const waveT = 1 + (t * 0.5); // Continue wave beyond body end (t=1)
+            const waveT = 1 + (t * PROCEDURAL_RENDERING.tail.WAVE_CONTINUATION); // Continue wave beyond body end (t=1)
             const y = Math.sin(waveTime - waveT * ANIMATION_CONFIG.wave.phaseGradient) *
                       ANIMATION_CONFIG.wave.amplitude * waveAmplitudeScale *
                       (1 - waveT * ANIMATION_CONFIG.wave.dampening);
@@ -553,8 +652,8 @@ export class KoiRenderer {
             rotation: 0,
             scale: sizeScale * tailLength,
             hue,
-            saturation: saturation + 5,
-            brightness: brightness - 12,
+            saturation: saturation + PROCEDURAL_RENDERING.tail.SATURATION_BOOST,
+            brightness: brightness + PROCEDURAL_RENDERING.tail.BRIGHTNESS_OFFSET,
             opacity: RENDERING_CONFIG.opacity.tail,
             mirror: 'none'
         });
@@ -574,8 +673,8 @@ export class KoiRenderer {
         // Original procedural tail rendering code
         const tailBase = segmentPositions[segmentPositions.length - 1];
         const tailStartX = tailBase.x + shapeParams.tailStartX * sizeScale;
-        const tailSegments = 6;
-        const tailLengthScaled = tailLength * 6 * sizeScale;
+        const tailSegments = PROCEDURAL_RENDERING.tail.LENGTH_MULTIPLIER;
+        const tailLengthScaled = tailLength * PROCEDURAL_RENDERING.tail.LENGTH_MULTIPLIER * sizeScale;
 
         // Calculate tail points
         const topPoints = [];
@@ -584,7 +683,9 @@ export class KoiRenderer {
         for (let i = 0; i <= tailSegments; i++) {
             const t = i / tailSegments;
             const x = tailStartX - (t * tailLengthScaled);
-            const tailSway = Math.sin(waveTime - 2.5 - t * 2) * 3 * sizeScale * (0.5 + t * 0.5);
+            const tailSway = Math.sin(waveTime + PROCEDURAL_RENDERING.tail.SWAY_PHASE_OFFSET + t * PROCEDURAL_RENDERING.tail.SWAY_PHASE_GRADIENT) *
+                           PROCEDURAL_RENDERING.tail.SWAY_AMPLITUDE * sizeScale *
+                           (PROCEDURAL_RENDERING.tail.SWAY_AMPLITUDE_START + t * PROCEDURAL_RENDERING.tail.SWAY_AMPLITUDE_END);
             const width = this.lerp(shapeParams.tailWidthStart, shapeParams.tailWidthEnd, t) * sizeScale;
 
             topPoints.push({ x, y: tailBase.y - width + tailSway });
@@ -594,10 +695,10 @@ export class KoiRenderer {
         // For sumi-e style, draw multiple layers for soft edges
         if (this.useSumieStyle) {
             for (let layer = 0; layer < 3; layer++) {
-                const offset = (layer - 1) * 0.4;
-                const opacity = layer === 1 ? 0.7 : 0.25;
+                const offset = (layer - 1) * PROCEDURAL_RENDERING.tail.LAYER_OFFSET;
+                const opacity = layer === 1 ? PROCEDURAL_RENDERING.tail.OPACITY_PRIMARY : PROCEDURAL_RENDERING.tail.OPACITY_SECONDARY;
 
-                context.fill(hue, saturation + 5, brightness - 12, opacity);
+                context.fill(hue, saturation + PROCEDURAL_RENDERING.tail.SATURATION_BOOST, brightness + PROCEDURAL_RENDERING.tail.BRIGHTNESS_OFFSET, opacity);
                 context.beginShape();
 
                 // Draw tail shape with curve vertices and offset
@@ -616,7 +717,7 @@ export class KoiRenderer {
         }
 
         // Normal rendering (non-sumi-e)
-        context.fill(hue, saturation + 5, brightness - 12, 1.0);
+        context.fill(hue, saturation + PROCEDURAL_RENDERING.tail.SATURATION_BOOST, brightness + PROCEDURAL_RENDERING.tail.BRIGHTNESS_OFFSET, 1.0);
         context.beginShape();
 
         context.curveVertex(topPoints[0].x, topPoints[0].y);
@@ -688,22 +789,22 @@ export class KoiRenderer {
      * @param {Object} params - Flutter parameters
      * @param {number} params.waveTime - Animation time
      * @param {number} params.sizeScale - Size multiplier
-     * @param {number} [params.phaseOffset=-2.5] - Phase offset for wave
-     * @param {number} [params.phaseGradient=-2] - Phase change per unit distance (creates traveling wave)
-     * @param {number} [params.amplitudeStart=0.5] - Flutter amplitude at base (multiplier)
-     * @param {number} [params.amplitudeEnd=1.0] - Flutter amplitude at tip (multiplier)
-     * @param {number} [params.amplitudeScale=3] - Overall amplitude scaling
+     * @param {number} [params.phaseOffset] - Phase offset for wave (default from PROCEDURAL_RENDERING.tail)
+     * @param {number} [params.phaseGradient] - Phase change per unit distance (default from PROCEDURAL_RENDERING.tail)
+     * @param {number} [params.amplitudeStart] - Flutter amplitude at base (default from PROCEDURAL_RENDERING.tail)
+     * @param {number} [params.amplitudeEnd] - Flutter amplitude at tip (default from PROCEDURAL_RENDERING.tail)
+     * @param {number} [params.amplitudeScale] - Overall amplitude scaling (default from PROCEDURAL_RENDERING.tail)
      * @returns {Array<{x, y}>} - Deformed vertices
      */
     applyFlutterDeformation(vertices, params) {
         const {
             waveTime,
             sizeScale,
-            phaseOffset = -2.5,
-            phaseGradient = -2,
-            amplitudeStart = 0.5,
-            amplitudeEnd = 1.0,
-            amplitudeScale = 3
+            phaseOffset = PROCEDURAL_RENDERING.tail.SWAY_PHASE_OFFSET,
+            phaseGradient = PROCEDURAL_RENDERING.tail.SWAY_PHASE_GRADIENT,
+            amplitudeStart = PROCEDURAL_RENDERING.tail.SWAY_AMPLITUDE_START,
+            amplitudeEnd = PROCEDURAL_RENDERING.tail.SWAY_AMPLITUDE_END,
+            amplitudeScale = PROCEDURAL_RENDERING.tail.SWAY_AMPLITUDE
         } = params;
 
         // Find X bounds for normalization (0 to 1 from base to tip) - optimized
@@ -744,20 +845,20 @@ export class KoiRenderer {
      * @param {Object} params - Rotation parameters
      * @param {number} params.waveTime - Animation time
      * @param {number} [params.rotationAmplitude=0] - Rotation amplitude in radians
-     * @param {number} [params.rotationFrequency=1.2] - Rotation frequency multiplier
+     * @param {number} [params.rotationFrequency] - Rotation frequency multiplier (default from PROCEDURAL_RENDERING.fins)
      * @param {Object} [params.pivot={x:0,y:0}] - Rotation pivot point
      * @param {number} [params.ySwayAmplitude=0] - Y sway amplitude (optional)
-     * @param {number} [params.ySwayPhase=-0.5] - Y sway phase offset
+     * @param {number} [params.ySwayPhase] - Y sway phase offset (default from PROCEDURAL_RENDERING.fins)
      * @returns {Array<{x, y}>} - Deformed vertices
      */
     applyRotationDeformation(vertices, params) {
         const {
             waveTime,
             rotationAmplitude = 0,
-            rotationFrequency = 1.2,
+            rotationFrequency = PROCEDURAL_RENDERING.fins.ROTATION_FREQUENCY,
             pivot = { x: 0, y: 0 },
             ySwayAmplitude = 0,
-            ySwayPhase = -0.5
+            ySwayPhase = PROCEDURAL_RENDERING.fins.SWAY_PHASE_OFFSET
         } = params;
 
         const rotationAngle = Math.sin(waveTime * rotationFrequency) * rotationAmplitude;
@@ -906,8 +1007,8 @@ export class KoiRenderer {
         if (this.useSumieStyle) {
             // 3-layer rendering for soft edges
             for (let layer = 0; layer < 3; layer++) {
-                const offset = (layer - 1) * 0.3;
-                const layerOpacity = layer === 1 ? opacity : opacity * 0.4;
+                const offset = (layer - 1) * PROCEDURAL_RENDERING.sumie.LAYER_OFFSET_SVG;
+                const layerOpacity = layer === 1 ? opacity : opacity * PROCEDURAL_RENDERING.sumie.OPACITY_SVG_SECONDARY;
 
                 context.fill(hue, saturation, brightness, layerOpacity);
                 context.beginShape();
@@ -975,10 +1076,10 @@ export class KoiRenderer {
         if (this.useSumieStyle) {
             // Draw 3 layers with slight variations for soft edges
             for (let layer = 0; layer < 3; layer++) {
-                const offset = (layer - 1) * 0.3; // Slight positional variation
-                const opacity = layer === 1 ? 0.7 : 0.3; // Middle layer darker
+                const offset = (layer - 1) * PROCEDURAL_RENDERING.sumie.LAYER_OFFSET_BODY; // Slight positional variation
+                const opacity = layer === 1 ? PROCEDURAL_RENDERING.sumie.OPACITY_PRIMARY : PROCEDURAL_RENDERING.sumie.OPACITY_SECONDARY; // Middle layer darker
 
-                context.fill(hue, saturation, brightness - 2, opacity);
+                context.fill(hue, saturation, brightness + PROCEDURAL_RENDERING.body.BRIGHTNESS_OFFSET, opacity);
                 context.beginShape();
 
                 const headSeg = segmentPositions[0];
@@ -991,13 +1092,13 @@ export class KoiRenderer {
 
                 for (let i = 0; i < segmentPositions.length; i++) {
                     const seg = segmentPositions[i];
-                    const topMultiplier = 0.48 * (1 - asymmetry * 0.15);
+                    const topMultiplier = PROCEDURAL_RENDERING.body.WIDTH_MULTIPLIER * (1 - asymmetry * PROCEDURAL_RENDERING.body.ASYMMETRY_FACTOR);
                     context.curveVertex(seg.x, seg.y - seg.w * topMultiplier + offset);
                 }
 
                 for (let i = segmentPositions.length - 1; i >= 0; i--) {
                     const seg = segmentPositions[i];
-                    const bottomMultiplier = 0.48 * (1 + asymmetry * 0.15);
+                    const bottomMultiplier = PROCEDURAL_RENDERING.body.WIDTH_MULTIPLIER * (1 + asymmetry * PROCEDURAL_RENDERING.body.ASYMMETRY_FACTOR);
                     context.curveVertex(seg.x, seg.y + seg.w * bottomMultiplier + offset);
                 }
 
@@ -1013,7 +1114,7 @@ export class KoiRenderer {
         }
 
         // Normal rendering (non-sumi-e)
-        context.fill(hue, saturation, brightness - 2, 1.0);
+        context.fill(hue, saturation, brightness + PROCEDURAL_RENDERING.body.BRIGHTNESS_OFFSET, 1.0);
         context.beginShape();
 
         // Head point
@@ -1031,7 +1132,7 @@ export class KoiRenderer {
         for (let i = 0; i < segmentPositions.length; i++) {
             const seg = segmentPositions[i];
             // If asymmetry is positive, make back less wide
-            const topMultiplier = 0.48 * (1 - asymmetry * 0.15);
+            const topMultiplier = PROCEDURAL_RENDERING.body.WIDTH_MULTIPLIER * (1 - asymmetry * PROCEDURAL_RENDERING.body.ASYMMETRY_FACTOR);
             context.curveVertex(seg.x, seg.y - seg.w * topMultiplier);
         }
 
@@ -1039,7 +1140,7 @@ export class KoiRenderer {
         for (let i = segmentPositions.length - 1; i >= 0; i--) {
             const seg = segmentPositions[i];
             // If asymmetry is positive, make belly more wide/round
-            const bottomMultiplier = 0.48 * (1 + asymmetry * 0.15);
+            const bottomMultiplier = PROCEDURAL_RENDERING.body.WIDTH_MULTIPLIER * (1 + asymmetry * PROCEDURAL_RENDERING.body.ASYMMETRY_FACTOR);
             context.curveVertex(seg.x, seg.y + seg.w * bottomMultiplier);
         }
 
@@ -1050,12 +1151,12 @@ export class KoiRenderer {
         context.endShape(context.CLOSE);
 
         // Segment lines for definition
-        context.strokeWeight(0.3);
-        context.stroke(hue, saturation + 10, brightness - 25, 0.4);
+        context.strokeWeight(PROCEDURAL_RENDERING.body.SEGMENT_LINE_WEIGHT);
+        context.stroke(hue, saturation + PROCEDURAL_RENDERING.body.SATURATION_BOOST, brightness + PROCEDURAL_RENDERING.body.BRIGHTNESS_BOOST, PROCEDURAL_RENDERING.body.SEGMENT_LINE_ALPHA);
         for (let i = 1; i < segmentPositions.length - 1; i++) {
             const seg = segmentPositions[i];
-            const topY = seg.y - seg.w * 0.48;
-            const bottomY = seg.y + seg.w * 0.48;
+            const topY = seg.y - seg.w * PROCEDURAL_RENDERING.body.WIDTH_MULTIPLIER;
+            const bottomY = seg.y + seg.w * PROCEDURAL_RENDERING.body.WIDTH_MULTIPLIER;
             context.line(seg.x, topY, seg.x, bottomY);
         }
         context.noStroke();
@@ -1138,7 +1239,7 @@ export class KoiRenderer {
             // Top edge
             for (let i = 0; i < segmentPositions.length; i++) {
                 const seg = segmentPositions[i];
-                const topY = seg.y - seg.w * 0.48;
+                const topY = seg.y - seg.w * PROCEDURAL_RENDERING.body.WIDTH_MULTIPLIER;
                 if (i === 0) {
                     ctx.moveTo(seg.x, topY);
                 } else {
@@ -1148,7 +1249,7 @@ export class KoiRenderer {
             // Bottom edge (reverse)
             for (let i = segmentPositions.length - 1; i >= 0; i--) {
                 const seg = segmentPositions[i];
-                const bottomY = seg.y + seg.w * 0.48;
+                const bottomY = seg.y + seg.w * PROCEDURAL_RENDERING.body.WIDTH_MULTIPLIER;
                 ctx.lineTo(seg.x, bottomY);
             }
             ctx.closePath();
@@ -1219,7 +1320,7 @@ export class KoiRenderer {
                     seg.x,
                     seg.y + spot.offsetY * sizeScale,
                     spotSize,
-                    spotSize * 0.8
+                    spotSize * BRUSH_TEXTURE_CONFIG.SPOT_HEIGHT_RATIO
                 );
             }
             return;
@@ -1239,7 +1340,7 @@ export class KoiRenderer {
                     seg.x,
                     seg.y + spot.offsetY * sizeScale,
                     spotSize,
-                    spotSize * 0.8
+                    spotSize * BRUSH_TEXTURE_CONFIG.SPOT_HEIGHT_RATIO
                 );
             }
             return;
@@ -1289,7 +1390,7 @@ export class KoiRenderer {
             // No runtime tinting needed - texture is already colored and cached
             context.imageMode(context.CENTER);
             const finalSpotWidth = spotSize * randomSizeVariation;
-            const finalSpotHeight = spotSize * 0.8 * randomSizeVariation;
+            const finalSpotHeight = spotSize * BRUSH_TEXTURE_CONFIG.SPOT_HEIGHT_RATIO * randomSizeVariation;
             context.image(tintedSpot, 0, 0, finalSpotWidth, finalSpotHeight);
 
             context.pop();
@@ -1322,7 +1423,7 @@ export class KoiRenderer {
             scale: sizeScale,
             hue,
             saturation,
-            brightness: brightness + 2, // Slightly brighter than body
+            brightness: brightness + PROCEDURAL_RENDERING.head.BRIGHTNESS_OFFSET, // Slightly brighter than body
             opacity: RENDERING_CONFIG.opacity.head,
             mirror: 'none'
         });
@@ -1377,11 +1478,11 @@ export class KoiRenderer {
         // For sumi-e style, draw head with multiple layers for soft edges
         if (this.useSumieStyle) {
             for (let layer = 0; layer < 3; layer++) {
-                const offset = (layer - 1) * 0.25;
-                const sizeVariation = 1 + (layer - 1) * 0.08;
-                const opacity = layer === 1 ? 0.8 : 0.3;
+                const offset = (layer - 1) * PROCEDURAL_RENDERING.head.LAYER_OFFSET;
+                const sizeVariation = 1 + (layer - 1) * PROCEDURAL_RENDERING.head.SIZE_VARIATION;
+                const opacity = layer === 1 ? PROCEDURAL_RENDERING.head.OPACITY_PRIMARY : PROCEDURAL_RENDERING.head.OPACITY_SECONDARY;
 
-                context.fill(hue, saturation, brightness + 2, opacity);
+                context.fill(hue, saturation, brightness + PROCEDURAL_RENDERING.head.BRIGHTNESS_OFFSET, opacity);
                 context.ellipse(
                     headX + offset,
                     headY + offset,
@@ -1391,7 +1492,7 @@ export class KoiRenderer {
             }
         } else {
             // Normal rendering
-            context.fill(hue, saturation, brightness + 2, 1.0);
+            context.fill(hue, saturation, brightness + PROCEDURAL_RENDERING.head.BRIGHTNESS_OFFSET, 1.0);
             context.ellipse(headX, headY, headWidth, headHeight);
         }
 
