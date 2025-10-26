@@ -1,12 +1,14 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Koi Ventral Fin Template
-     Dimensions: 3 × 1.5 units (length × width)
-     Anchor: Base at (0, 0) - left edge
-     Simple elliptical shape for now (user will refine in Illustrator)
-     Centered vertically at origin
--->
-<svg width="3" height="1.5" viewBox="-1.5 -0.75 3 1.5" xmlns="http://www.w3.org/2000/svg">
-  <!-- Simple polygon ellipse approximation (8 points) -->
-  <polygon points="0,0 0.75,-0.5625 1.5,-0.675 2.25,-0.375 3,0 2.25,0.375 1.5,0.675 0.75,0.5625"
-           fill="#ffffff" stroke="#000000" stroke-width="0.05"/>
+<svg id="Layer_1" xmlns="http://www.w3.org/2000/svg" version="1.1" viewBox="0 0 3 1.5">
+  <!-- Generator: Adobe Illustrator 29.8.2, SVG Export Plug-In . SVG Version: 2.1.1 Build 3)  -->
+  <defs>
+    <style>
+      .st0 {
+        fill: #fff;
+        stroke: #000;
+        stroke-width: .05px;
+      }
+    </style>
+  </defs>
+  <polygon class="st0" points="0 .75 .75 .19 1.5 .07 2.25 .38 3 .75 2.25 1.12 1.5 1.43 .75 1.31 0 .75"/>
 </svg>

@@ -6,30 +6,30 @@
 export const DEFAULT_SHAPE_PARAMS = {
     // Body structure
     numSegments: 10,
-    bodyWidth: 2.4,
+    bodyWidth: 2.30,
     bodyHeight: 0.95,
     bodyTaperStart: 0.15,     // Where tapering begins (0-1, segment position)
-    bodyTaperStrength: 0.9,   // How much to taper (0-1)
-    bodyPeakPosition: 0.7,    // Where body is widest (0-1)
+    bodyTaperStrength: 0.90,   // How much to taper (0-1)
+    bodyPeakPosition: 0.70,    // Where body is widest (0-1)
     bodyPeakWidth: 8.0,       // Maximum width multiplier
     bodyFrontWidth: 4.5,      // Front width multiplier
-    bodyAsymmetry: 0.9,       // Belly rounder than back (-1 to 1)
+    bodyAsymmetry: 0.90,       // Belly rounder than back (-1 to 1)
 
     // Head
-    headX: -0.6,
+    headX: -0.2,
     headWidth: 7.5,
     headHeight: 5.0,
 
     // Eyes (added for dual-eye rendering)
-    eyeX: 1.3,
-    eyeYTop: -2.2,
-    eyeYBottom: 2.0,
-    eyeSize: 1.0,
+    eyeX: 2.0,
+    eyeYTop: -1.6,
+    eyeYBottom: 1.5,
+    eyeSize: 0.5,
 
     // Tail
-    tailStartX: -1,
-    tailWidthStart: 0.2,
-    tailWidthEnd: 1.5,
+    tailStartX: 1,
+    tailWidthStart: 0.20,
+    tailWidthEnd: 1.50,
     tailSplit: 0.5,
 
     // Dorsal fin
@@ -38,16 +38,16 @@ export const DEFAULT_SHAPE_PARAMS = {
 
     // Pectoral fins
     pectoralPos: 2,
-    pectoralYTop: -2,
+    pectoralYTop: -2.5,
     pectoralAngleTop: -2.5,
-    pectoralYBottom: 2,
+    pectoralYBottom: 2.0,
     pectoralAngleBottom: 2.1,
 
     // Ventral fins
-    ventralPos: 7,
-    ventralYTop: -1,
+    ventralPos: 5,
+    ventralYTop: -1.5,
     ventralAngleTop: -2.5,
-    ventralYBottom: 1,
+    ventralYBottom: 1.5,
     ventralAngleBottom: 2.5
 };
 
@@ -71,7 +71,7 @@ export const PARAMETER_RANGES = {
     eyeYBottom: { min: 0, max: 4, step: 0.1, label: 'Bottom Eye Y Position' },
     eyeSize: { min: 0.5, max: 2, step: 0.1, label: 'Eye Size' },
 
-    tailStartX: { min: -3, max: 0, step: 0.1, label: 'Tail Start X' },
+    tailStartX: { min: -0.4, max: .4, step: 0.1, label: 'Tail Start X' },
     tailWidthStart: { min: 0.1, max: 1, step: 0.05, label: 'Tail Width Start' },
     tailWidthEnd: { min: 0.5, max: 3, step: 0.1, label: 'Tail Width End' },
     tailSplit: { min: 0, max: 2, step: 0.1, label: 'Tail Split' },

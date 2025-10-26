@@ -14,7 +14,7 @@ let isPlaying = false;
 let params = {
     pixelScale: 4,
     numBoids: 80,
-    maxSpeed: 1,
+    maxSpeed: -0.5,
     maxForce: 0.1,
     separationWeight: 1.2,
     alignmentWeight: 1.2,

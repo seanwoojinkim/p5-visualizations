@@ -1,0 +1,13 @@
+{
+  "name": "visualizations",
+  "version": "1.0.0",
+  "description": "Collection of interactive visualizations",
+  "private": true,
+  "scripts": {
+    "dev": "http-server -p 8000 -a 0.0.0.0 -o",
+    "start": "http-server -p 8000 -a 0.0.0.0"
+  },
+  "devDependencies": {
+    "http-server": "^14.1.1"
+  }
+}

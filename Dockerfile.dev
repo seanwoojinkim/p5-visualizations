@@ -1,0 +1,47 @@
+# Dockerfile for Visualizations Development with Claude Code
+# Based on docker-autonomous.md guide with Claude data persistence
+
+FROM node:20-bookworm
+
+# Install Claude Code CLI (global npm install)
+RUN npm install -g @anthropic-ai/claude-code
+
+# Install development tools and Python3 for compatibility
+RUN apt-get update && apt-get install -y \
+    git \
+    curl \
+    vim \
+    python3 \
+    python3-pip \
+    netcat-openbsd \
+    sudo \
+    gosu \
+    && rm -rf /var/lib/apt/lists/*
+
+# Configure git safe directory for node user
+RUN git config --global --add safe.directory /workspace
+
+# Set working directory
+WORKDIR /workspace
+
+# Copy package files first for better layer caching
+COPY package*.json ./
+
+# Install Node dependencies
+RUN npm install
+
+# Copy and set up entrypoint script (must be before USER directive)
+COPY docker-entrypoint.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+
+# Change ownership of workspace and node home to node user
+RUN chown -R node:node /workspace /home/node
+
+# Expose port for http-server
+EXPOSE 8000
+
+# Use entrypoint to fix permissions on volumes and switch to node user
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
+
+# Default command - keep container running as node user
+CMD ["/bin/bash"]

@@ -5,6 +5,8 @@
  */
 
 import { DEFAULT_SHAPE_PARAMS } from './koi-params.js';
+import { ANIMATION_CONFIG } from './animation-config.js';
+import { RENDERING_CONFIG } from './rendering-config.js';
 
 export class KoiRenderer {
     /**
@@ -119,15 +121,16 @@ export class KoiRenderer {
         const brightness = Math.min(100, colorParams.b + brightnessBoost);
 
         // RENDERING ORDER (for proper z-layering):
-        // 1. Fins (drawn first, appear behind body)
+        // 1. Pectoral and Ventral fins (drawn first, appear behind body)
         // 2. Tail (drawn second, behind body)
         // 3. Body outline (drawn on top of fins and tail)
         // 4. Head (drawn before spots so spots appear on head)
-        // 5. Spots (drawn last, on top of everything including head)
+        // 5. Spots (on top of head)
+        // 6. Dorsal fin (drawn last, appears on top of body)
 
         this.drawFins(context, segmentPositions, shapeParams, waveTime, finalSizeScale, hue, saturation, brightness, {
             pectoralFin: svgVertices.pectoralFin,
-            dorsalFin: svgVertices.dorsalFin,
+            dorsalFin: null, // Don't draw dorsal fin yet
             ventralFin: svgVertices.ventralFin
         });
         this.drawTail(context, segmentPositions, shapeParams, waveTime, finalSizeScale, tailLength, hue, saturation, brightness, svgVertices.tail);
@@ -139,8 +142,15 @@ export class KoiRenderer {
             this.drawBody(context, segmentPositions, shapeParams, finalSizeScale, hue, saturation, brightness);
         }
 
-        this.drawHead(context, segmentPositions[0], shapeParams, finalSizeScale, hue, saturation, brightness);
+        this.drawHead(context, segmentPositions[0], shapeParams, finalSizeScale, hue, saturation, brightness, svgVertices.head);
         this.drawSpots(context, segmentPositions, pattern.spots || [], finalSizeScale);
+
+        // Draw dorsal fin last so it appears on top of the body
+        this.drawFins(context, segmentPositions, shapeParams, waveTime, finalSizeScale, hue, saturation, brightness, {
+            pectoralFin: null, // Don't draw pectoral fins again
+            dorsalFin: svgVertices.dorsalFin, // Only draw dorsal fin
+            ventralFin: null // Don't draw ventral fins again
+        });
 
         // Restore graphics state
         context.pop();
@@ -156,7 +166,9 @@ export class KoiRenderer {
         for (let i = 0; i < numSegments; i++) {
             const t = i / numSegments;
             const x = this.lerp(7, -9, t) * sizeScale * lengthMultiplier;
-            const y = Math.sin(waveTime - t * 3.5) * 1.5 * sizeScale * (1 - t * 0.2);
+            const y = Math.sin(waveTime - t * ANIMATION_CONFIG.wave.phaseGradient) *
+                      ANIMATION_CONFIG.wave.amplitude * sizeScale *
+                      (1 - t * ANIMATION_CONFIG.wave.dampening);
 
             // Calculate width based on position using new parameters
             // Create a smooth curve from front to peak to tail
@@ -203,13 +215,21 @@ export class KoiRenderer {
      * @param {string} [mirror='none'] - Mirror type ('none', 'horizontal', 'vertical')
      */
     drawFinFromSVG(context, segmentPos, svgVertices, yOffset, baseAngle, waveTime, rotationAmplitude, sway, sizeScale, hue, saturation, brightness, mirror = 'none') {
+        // Calculate pivot at attachment edge (left edge center)
+        // This ensures fins rotate naturally from their body connection point
+        const xs = svgVertices.map(v => v.x);
+        const attachmentPivot = {
+            x: Math.min(...xs),  // Left edge X coordinate (closest to body)
+            y: 0                 // Center line
+        };
+
         this.drawSVGShape(context, svgVertices, {
             deformationType: 'rotate',
             deformationParams: {
                 waveTime,
                 rotationAmplitude,
                 rotationFrequency: 1.2, // Matches procedural: waveTime * 1.2
-                pivot: { x: 0, y: 0 }, // Rotate around base (left edge)
+                pivot: attachmentPivot, // Rotate around attachment edge
                 ySwayAmplitude: 0, // Y sway applied via positionY instead
                 ySwayPhase: 0
             },
@@ -220,7 +240,7 @@ export class KoiRenderer {
             hue,
             saturation: saturation + 8,
             brightness: brightness - 15,
-            opacity: this.useSumieStyle ? 0.6 : 0.7,
+            opacity: RENDERING_CONFIG.opacity.fins,
             mirror
         });
     }
@@ -248,7 +268,7 @@ export class KoiRenderer {
 
         if (useSVG) {
             // SVG-based fin rendering
-            const finSway = Math.sin(waveTime - 0.5) * 0.8;
+            const finSway = Math.sin(waveTime - 0.5) * ANIMATION_CONFIG.fins.pectoral.swayAmplitude;
 
             // Pectoral fins (left and right)
             const finPos = segmentPositions[shapeParams.pectoralPos];
@@ -259,7 +279,7 @@ export class KoiRenderer {
                     shapeParams.pectoralYTop,
                     shapeParams.pectoralAngleTop,
                     waveTime,
-                    0.15, // rotationAmplitude
+                    ANIMATION_CONFIG.fins.pectoral.rotationAmplitude,
                     finSway,
                     sizeScale,
                     hue, saturation, brightness,
@@ -272,7 +292,7 @@ export class KoiRenderer {
                     shapeParams.pectoralYBottom,
                     shapeParams.pectoralAngleBottom,
                     waveTime,
-                    -0.15, // Negative for opposite rotation
+                    -ANIMATION_CONFIG.fins.pectoral.rotationAmplitude, // Negative for opposite rotation
                     -finSway, // Opposite sway
                     sizeScale,
                     hue, saturation, brightness,
@@ -280,20 +300,39 @@ export class KoiRenderer {
                 );
             }
 
-            // Dorsal fin
-            const dorsalPos = segmentPositions[shapeParams.dorsalPos];
+            // Dorsal fin - uses wave deformation to follow body undulation
             if (svgVertices.dorsalFin) {
-                this.drawFinFromSVG(
-                    context, dorsalPos, svgVertices.dorsalFin,
-                    shapeParams.dorsalY,
-                    -0.2, // Base angle (static)
-                    waveTime,
-                    0, // No rotation animation for dorsal fin
-                    0, // No sway
-                    sizeScale,
-                    hue, saturation, brightness,
-                    'none'
-                );
+                // Create mini body segments for dorsal fin to follow body wave
+                // Apply dampening to make the wave more subtle on the fin
+                const dorsalSegments = [];
+                const dorsalStartIdx = Math.max(0, shapeParams.dorsalPos - 1);
+                const dorsalEndIdx = Math.min(segmentPositions.length - 1, shapeParams.dorsalPos + 2);
+
+                for (let i = dorsalStartIdx; i <= dorsalEndIdx; i++) {
+                    // Dampen the Y offset for a more subtle wave
+                    dorsalSegments.push({
+                        x: segmentPositions[i].x,
+                        y: segmentPositions[i].y * ANIMATION_CONFIG.wave.dorsalDampening,
+                        w: segmentPositions[i].w
+                    });
+                }
+
+                this.drawSVGShape(context, svgVertices.dorsalFin, {
+                    deformationType: 'wave',
+                    deformationParams: {
+                        segmentPositions: dorsalSegments,
+                        numSegments: dorsalSegments.length
+                    },
+                    positionX: segmentPositions[shapeParams.dorsalPos].x,
+                    positionY: segmentPositions[shapeParams.dorsalPos].y + shapeParams.dorsalY * sizeScale,
+                    rotation: 0,
+                    scale: sizeScale,
+                    hue,
+                    saturation: saturation + 8,
+                    brightness: brightness - 15,
+                    opacity: RENDERING_CONFIG.opacity.fins,
+                    mirror: 'none'
+                });
             }
 
             // Ventral fins (top and bottom)
@@ -305,7 +344,7 @@ export class KoiRenderer {
                     shapeParams.ventralYTop,
                     shapeParams.ventralAngleTop,
                     waveTime,
-                    0.1, // rotationAmplitude
+                    ANIMATION_CONFIG.fins.ventral.rotationAmplitude,
                     0, // No sway
                     sizeScale,
                     hue, saturation, brightness,
@@ -318,7 +357,7 @@ export class KoiRenderer {
                     shapeParams.ventralYBottom,
                     shapeParams.ventralAngleBottom,
                     waveTime,
-                    -0.1, // Opposite rotation
+                    -ANIMATION_CONFIG.fins.ventral.rotationAmplitude, // Opposite rotation
                     0,
                     sizeScale,
                     hue, saturation, brightness,
@@ -431,19 +470,29 @@ export class KoiRenderer {
         const tailBase = segmentPositions[segmentPositions.length - 1];
         const tailStartX = tailBase.x + shapeParams.tailStartX * sizeScale;
 
+        // Calculate tail's rightmost edge (connection point to body)
+        // This ensures the tail connects seamlessly regardless of SVG shape
+        const tailXCoords = svgVertices.map(v => v.x);
+        const tailRightEdge = Math.max(...tailXCoords);
+
+        // Position tail so its right edge aligns with tailStartX
+        const tailConnectionX = tailStartX - (tailRightEdge * sizeScale * tailLength);
+
         // Create extended segments for tail (continues body wave motion)
         // Tail extends beyond body segments, continuing the wave pattern
-        const numTailSegments = 6;
+        const numTailSegments = ANIMATION_CONFIG.tail.segments;
         const tailSegments = [];
         const bodySegmentCount = segmentPositions.length;
 
         for (let i = 0; i < numTailSegments; i++) {
             const t = i / numTailSegments;
             const x = tailStartX - (t * tailLength * 6 * sizeScale);
-            // Continue the wave formula from body: Math.sin(waveTime - t * 3.5)
+            // Continue the wave formula from body
             // But adjust t to continue from where body left off
             const waveT = 1 + (t * 0.5); // Continue wave beyond body end (t=1)
-            const y = Math.sin(waveTime - waveT * 3.5) * 1.5 * sizeScale * (1 - waveT * 0.2);
+            const y = Math.sin(waveTime - waveT * ANIMATION_CONFIG.wave.phaseGradient) *
+                      ANIMATION_CONFIG.wave.amplitude * sizeScale *
+                      (1 - waveT * ANIMATION_CONFIG.wave.dampening);
             tailSegments.push({ x, y, w: 0 });
         }
 
@@ -453,14 +502,14 @@ export class KoiRenderer {
                 segmentPositions: tailSegments,
                 numSegments: numTailSegments
             },
-            positionX: tailStartX,  // Position tail at back of body
-            positionY: tailBase.y,  // At body's Y position (inherits body wave)
+            positionX: tailConnectionX,  // Position tail by its connection edge
+            positionY: 0,  // Wave already applied via deformation, don't double-apply
             rotation: 0,
             scale: sizeScale * tailLength,
             hue,
             saturation: saturation + 5,
             brightness: brightness - 12,
-            opacity: this.useSumieStyle ? 0.7 : 0.8,
+            opacity: RENDERING_CONFIG.opacity.tail,
             mirror: 'none'
         });
     }
@@ -521,7 +570,7 @@ export class KoiRenderer {
         }
 
         // Normal rendering (non-sumi-e)
-        context.fill(hue, saturation + 5, brightness - 12, 0.8);
+        context.fill(hue, saturation + 5, brightness - 12, 1.0);
         context.beginShape();
 
         context.curveVertex(topPoints[0].x, topPoints[0].y);
@@ -539,6 +588,7 @@ export class KoiRenderer {
     /**
      * Apply wave deformation to SVG vertices (body wave)
      * Maps each vertex to a body segment and applies the segment's wave offset
+     * Uses linear interpolation between segments for smooth deformation
      * @param {Array<{x, y}>} vertices - Original SVG vertices
      * @param {Object} params - Deformation parameters
      * @param {Array<{x, y, w}>} params.segmentPositions - Body segments with wave offsets
@@ -548,12 +598,35 @@ export class KoiRenderer {
     applyWaveDeformation(vertices, params) {
         const { segmentPositions, numSegments } = params;
 
+        // Calculate X bounds once for all vertices (optimization)
+        const xs = vertices.map(v => v.x);
+        const minX = Math.min(...xs);
+        const maxX = Math.max(...xs);
+        const range = maxX - minX;
+
         return vertices.map(v => {
-            const segIdx = this.mapVertexToSegment(v.x, vertices, numSegments);
-            const segment = segmentPositions[segIdx];
+            // Normalize vertex X to 0-1 range, flipped so rightmost = 0, leftmost = 1
+            const flippedT = range === 0 ? 0 : (maxX - v.x) / range;
+
+            // Map to segment range with interpolation
+            const segmentFloat = flippedT * (numSegments - 1);
+            const segIdx = Math.floor(segmentFloat);
+            const blend = segmentFloat - segIdx; // Fractional part for interpolation
+
+            // Clamp indices to valid range
+            const currentIdx = Math.max(0, Math.min(segIdx, numSegments - 1));
+            const nextIdx = Math.min(currentIdx + 1, numSegments - 1);
+
+            // Get Y offsets from current and next segment
+            const currentY = segmentPositions[currentIdx].y;
+            const nextY = segmentPositions[nextIdx].y;
+
+            // Linear interpolation between segments
+            const interpolatedY = currentY + (nextY - currentY) * blend;
+
             return {
                 x: v.x,
-                y: v.y + segment.y
+                y: v.y + interpolatedY
             };
         });
     }
@@ -759,7 +832,7 @@ export class KoiRenderer {
             hue,
             saturation,
             brightness,
-            opacity = 0.8,
+            opacity = 1.0,
             mirror = 'none'
         } = config;
 
@@ -773,6 +846,7 @@ export class KoiRenderer {
         context.push();
         context.translate(positionX, positionY);
         context.rotate(rotation);
+        context.noStroke(); // Remove stroke for clean SVG rendering
 
         if (this.useSumieStyle) {
             // 3-layer rendering for soft edges
@@ -830,7 +904,7 @@ export class KoiRenderer {
             hue,
             saturation,
             brightness: brightness - 2,
-            opacity: this.useSumieStyle ? 0.7 : 0.92,
+            opacity: RENDERING_CONFIG.opacity.body,
             mirror: 'none'
         });
 
@@ -884,7 +958,7 @@ export class KoiRenderer {
         }
 
         // Normal rendering (non-sumi-e)
-        context.fill(hue, saturation, brightness - 2, 0.92);
+        context.fill(hue, saturation, brightness - 2, 1.0);
         context.beginShape();
 
         // Head point
@@ -962,16 +1036,85 @@ export class KoiRenderer {
                 }
             } else {
                 // Normal rendering
-                context.fill(spot.color.h, spot.color.s, spot.color.b, 0.85);
+                context.fill(spot.color.h, spot.color.s, spot.color.b, 1.0);
                 context.ellipse(spotX, spotY, spotW, spotH);
             }
         }
     }
 
     /**
-     * Draw head and eyes
+     * Draw head from SVG vertices (static, no animation)
+     * Eyes are always rendered procedurally on top of the SVG head shape
+     * @param {Object} context - p5 graphics context
+     * @param {Object} headSegment - Head segment position {x, y, w}
+     * @param {Array<{x, y}>} svgVertices - Head SVG vertices
+     * @param {Object} shapeParams - Shape parameters
+     * @param {number} sizeScale - Size multiplier
+     * @param {number} hue - HSB hue
+     * @param {number} saturation - HSB saturation
+     * @param {number} brightness - HSB brightness
      */
-    drawHead(context, headSegment, shapeParams, sizeScale, hue, saturation, brightness) {
+    drawHeadFromSVG(context, headSegment, svgVertices, shapeParams, sizeScale, hue, saturation, brightness) {
+        const headX = headSegment.x + shapeParams.headX * sizeScale;
+        const headY = headSegment.y;
+
+        // Draw head shape from SVG with static deformation (no animation)
+        this.drawSVGShape(context, svgVertices, {
+            deformationType: 'static', // No animation for head
+            deformationParams: {},
+            positionX: headX,
+            positionY: headY,
+            rotation: 0,
+            scale: sizeScale,
+            hue,
+            saturation,
+            brightness: brightness + 2, // Slightly brighter than body
+            opacity: RENDERING_CONFIG.opacity.head,
+            mirror: 'none'
+        });
+
+        // Eyes are always drawn procedurally (precise, small details)
+        // Rendered on top of SVG head shape
+        context.fill(0, 0, RENDERING_CONFIG.color.eyeBrightness, RENDERING_CONFIG.opacity.eyes);
+
+        // Left eye (top)
+        context.ellipse(
+            headSegment.x + shapeParams.eyeX * sizeScale,
+            headSegment.y + shapeParams.eyeYTop * sizeScale,
+            shapeParams.eyeSize * sizeScale,
+            shapeParams.eyeSize * sizeScale
+        );
+
+        // Right eye (bottom)
+        context.ellipse(
+            headSegment.x + shapeParams.eyeX * sizeScale,
+            headSegment.y + shapeParams.eyeYBottom * sizeScale,
+            shapeParams.eyeSize * sizeScale,
+            shapeParams.eyeSize * sizeScale
+        );
+    }
+
+    /**
+     * Draw head and eyes
+     * Uses SVG if vertices provided, otherwise uses procedural rendering
+     * Eyes are ALWAYS procedural regardless of head rendering method
+     * @param {Object} context - p5 graphics context
+     * @param {Object} headSegment - Head segment position {x, y, w}
+     * @param {Object} shapeParams - Shape parameters
+     * @param {number} sizeScale - Size multiplier
+     * @param {number} hue - HSB hue
+     * @param {number} saturation - HSB saturation
+     * @param {number} brightness - HSB brightness
+     * @param {Array<{x,y}>} [svgVertices=null] - Optional SVG vertices for head
+     */
+    drawHead(context, headSegment, shapeParams, sizeScale, hue, saturation, brightness, svgVertices = null) {
+        // Use SVG if provided, otherwise use procedural rendering
+        if (svgVertices && svgVertices.length > 0) {
+            this.drawHeadFromSVG(context, headSegment, svgVertices, shapeParams, sizeScale, hue, saturation, brightness);
+            return;
+        }
+
+        // PROCEDURAL HEAD RENDERING (fallback)
         const headX = headSegment.x + shapeParams.headX * sizeScale;
         const headY = headSegment.y;
         const headWidth = shapeParams.headWidth * sizeScale;
@@ -994,12 +1137,12 @@ export class KoiRenderer {
             }
         } else {
             // Normal rendering
-            context.fill(hue, saturation, brightness + 2, 0.92);
+            context.fill(hue, saturation, brightness + 2, 1.0);
             context.ellipse(headX, headY, headWidth, headHeight);
         }
 
         // Eyes (both sides for top-down view) - always solid, no layering
-        context.fill(0, 0, 10, 0.8);
+        context.fill(0, 0, 10, 1.0);
 
         // Left eye (top)
         context.ellipse(

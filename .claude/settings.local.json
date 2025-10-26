@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(test:*)",
+      "Bash(git commit:*)",
+      "Bash(vercel:*)",
+      "Bash(git log:*)",
+      "Bash(/Users/seankim/dev/visualizations/hack/generate_frontmatter.sh:*)",
+      "Bash(git -C /Users/seankim/dev/visualizations/flocking log -1 --format=\"%H%n%an%n%ae%n%ai\")",
+      "Bash(git add:*)",
+      "Bash(./hack/generate_frontmatter.sh:*)",
+      "WebSearch",
+      "Bash(git rev-parse:*)",
+      "Read(//Users/seankim/Wooj Dropbox/Utilities/grove/grove-mvp/docs/operations/**)",
+      "Read(//Users/seankim/Wooj Dropbox/Utilities/grove/grove-mvp/**)",
+      "Bash(chmod:*)",
+      "Bash(node -c:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

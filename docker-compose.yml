@@ -1,0 +1,38 @@
+services:
+  visualizations-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: visualizations-dev
+    volumes:
+      # Mount the entire project directory for real-time sync
+      # Changes in container appear on host immediately (and vice versa)
+      - .:/workspace
+      # Prevent node_modules from being overwritten by host
+      # This keeps container's Linux-compiled native modules separate
+      - /workspace/node_modules
+      # Named volume for Claude data persistence (auth, history, config)
+      # This persists .claude/ directory and .claude.json file
+      # Mounted to /home/node since we run as the node user
+      - claude-data:/home/node
+    ports:
+      # http-server for all visualizations (host:container)
+      - "8123:8000"
+    environment:
+      # Set environment variables
+      - NODE_ENV=development
+      # Add your Anthropic API key here or pass via .env file
+      # - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+    # Optional: Limit resources to prevent runaway processes
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 4G
+    # Keep container running
+    stdin_open: true
+    tty: true
+
+# Named volumes for data persistence
+volumes:
+  claude-data:

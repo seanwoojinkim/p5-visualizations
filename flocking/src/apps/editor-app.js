@@ -8,6 +8,7 @@ import { KoiRenderer } from '../core/koi-renderer.js';
 import { DEFAULT_SHAPE_PARAMS, copyParams } from '../core/koi-params.js';
 import { EditorControls } from '../ui/editor-controls.js';
 import { VARIETIES, generatePattern } from '../core/koi-varieties.js';
+import { SVGParser } from '../core/svg-parser.js';
 
 // Global state
 let renderer;
@@ -22,7 +23,91 @@ let currentVarietyIndex = 0;
 let currentVariety = VARIETIES[0];
 let currentPattern = null;
 
+// SVG vertices for all koi body parts
+// Loaded during preload phase, used in render call
+// If loading fails, renderer falls back to procedural rendering
+let bodyVertices = null;
+let tailVertices = null;
+let headVertices = null;
+let pectoralFinVertices = null;
+let dorsalFinVertices = null;
+let ventralFinVertices = null;
+
 const sizeScale = 15;
+const rendererSizeScale = 1; // Size scale for renderer (in koi units)
+const displayScale = 15; // Display scale for canvas
+
+// p5.js preload function (loads assets before setup)
+// Pattern mirrors simulation-app.js for consistency
+// Each SVG is loaded with specific target dimensions to match koi coordinate space
+window.preload = async function() {
+    console.log('Loading SVG body parts for editor...');
+
+    // Load and parse all SVG body parts
+    // Dimensions must match simulation-app.js for consistency
+
+    // Body: 16 × 5.2 units (X: -8 to +8, Y: -2.6 to +2.6)
+    bodyVertices = await SVGParser.loadSVGFromURL(
+        'assets/koi/body-parts/body.svg',
+        20,
+        { width: 16, height: 5.2 }
+    );
+
+    // Tail: 6 × 4 units (length × max width, matches procedural base dimensions)
+    tailVertices = await SVGParser.loadSVGFromURL(
+        'assets/koi/body-parts/tail.svg',
+        20,
+        { width: 6, height: 4 }
+    );
+
+    // Head: 7.5 × 5.0 units (width × height, matches procedural ellipse)
+    headVertices = await SVGParser.loadSVGFromURL(
+        'assets/koi/body-parts/head.svg',
+        20,
+        { width: 7.5, height: 5.0 }
+    );
+
+    // Pectoral fin: 4.5 × 2 units (length × width, elliptical)
+    pectoralFinVertices = await SVGParser.loadSVGFromURL(
+        'assets/koi/body-parts/pectoral-fin.svg',
+        20,
+        { width: 4.5, height: 2 }
+    );
+
+    // Dorsal fin: 4 × 5 units (width × height)
+    dorsalFinVertices = await SVGParser.loadSVGFromURL(
+        'assets/koi/body-parts/dorsal-fin.svg',
+        20,
+        { width: 4, height: 5 }
+    );
+
+    // Ventral fin: 3 × 1.5 units (length × width, elliptical)
+    ventralFinVertices = await SVGParser.loadSVGFromURL(
+        'assets/koi/body-parts/ventral-fin.svg',
+        20,
+        { width: 3, height: 1.5 }
+    );
+
+    // Log loading results for all parts
+    const parts = {
+        body: bodyVertices,
+        tail: tailVertices,
+        head: headVertices,
+        pectoralFin: pectoralFinVertices,
+        dorsalFin: dorsalFinVertices,
+        ventralFin: ventralFinVertices
+    };
+
+    console.log('SVG body parts loaded for editor:');
+    for (const [name, vertices] of Object.entries(parts)) {
+        if (vertices) {
+            const info = SVGParser.getDebugInfo(vertices);
+            console.log(`  ${name}: ${info.vertexCount} vertices, bounds: ${JSON.stringify(info.bounds)}`);
+        } else {
+            console.warn(`  ${name}: FAILED to load (will use procedural fallback)`);
+        }
+    }
+};
 
 // p5.js setup function
 window.setup = function() {
@@ -117,6 +202,7 @@ window.draw = function() {
 
     push();
     translate(centerX, centerY);
+    scale(displayScale); // Scale up for display
 
     // Calculate segment positions for control points
     const waveTime = frameCount * 0.05;
@@ -134,7 +220,7 @@ window.draw = function() {
             pattern: currentPattern || { spots: [] },
             animationParams: {
                 waveTime,
-                sizeScale,
+                sizeScale: rendererSizeScale, // Use koi-unit scale, not display scale
                 lengthMultiplier: 1,
                 tailLength: 1
             },
@@ -142,6 +228,14 @@ window.draw = function() {
                 brightnessBoost: 0,
                 saturationBoost: 0,
                 sizeScale: 1
+            },
+            svgVertices: {
+                body: bodyVertices,
+                tail: tailVertices,
+                head: headVertices,
+                pectoralFin: pectoralFinVertices,
+                dorsalFin: dorsalFinVertices,
+                ventralFin: ventralFinVertices
             }
         }
     );
@@ -152,11 +246,11 @@ window.draw = function() {
         fill(cp.color);
         if (cp === draggingPoint) {
             stroke(255, 255, 0);
-            strokeWeight(2);
+            strokeWeight(2 / displayScale);
         } else {
             noStroke();
         }
-        ellipse(cp.x, cp.y, 10, 10);
+        ellipse(cp.x, cp.y, 10 / displayScale, 10 / displayScale);
     }
 
     pop();
@@ -256,7 +350,7 @@ function updateControlPoints(segmentPositions) {
 window.mousePressed = function() {
     for (let cp of controlPoints) {
         const d = dist(mouseX - centerX, mouseY - centerY, cp.x, cp.y);
-        if (d < 10) {
+        if (d < 10 / displayScale) {
             draggingPoint = cp;
             return;
         }
