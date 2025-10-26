@@ -9,9 +9,11 @@ import { DEFAULT_SHAPE_PARAMS, copyParams } from '../core/koi-params.js';
 import { EditorControls } from '../ui/editor-controls.js';
 import { VARIETIES, generatePattern } from '../core/koi-varieties.js';
 import { SVGParser } from '../core/svg-parser.js';
+import { BrushTextures } from '../rendering/brush-textures.js';
 
 // Global state
 let renderer;
+let brushTextures;
 let controls;
 let params;
 let centerX, centerY;
@@ -37,10 +39,35 @@ const sizeScale = 15;
 const rendererSizeScale = 1; // Size scale for renderer (in koi units)
 const displayScale = 15; // Display scale for canvas
 
+// Brush texture images
+let brushTextureImages = {
+    body: null,
+    fin: null,
+    tail: null,
+    spots: [],  // Array of spot texture variations
+    paper: null
+};
+
 // p5.js preload function (loads assets before setup)
 // Pattern mirrors simulation-app.js for consistency
 // Each SVG is loaded with specific target dimensions to match koi coordinate space
 window.preload = async function() {
+    console.log('Loading brush texture images (pre-processed for performance)...');
+    brushTextureImages.body = loadImage('assets/koi/brushstrokes/body-processed.png');
+    brushTextureImages.fin = loadImage('assets/koi/brushstrokes/fin.png');
+    brushTextureImages.tail = loadImage('assets/koi/brushstrokes/tail.png');
+
+    // Load all spot texture variations (pre-processed for performance)
+    brushTextureImages.spots = [
+        loadImage('assets/koi/brushstrokes/spot-1-processed.png'),
+        loadImage('assets/koi/brushstrokes/spot-2-processed.png'),
+        loadImage('assets/koi/brushstrokes/spot-3-processed.png'),
+        loadImage('assets/koi/brushstrokes/spot-4-processed.png'),
+        loadImage('assets/koi/brushstrokes/spot-5-processed.png')
+    ];
+
+    brushTextureImages.paper = loadImage('assets/koi/brushstrokes/paper.png');
+
     console.log('Loading SVG body parts for editor...');
 
     // Load and parse all SVG body parts
@@ -117,8 +144,13 @@ window.setup = function() {
     centerX = width / 2;
     centerY = height / 2;
 
-    // Initialize renderer
-    renderer = new KoiRenderer();
+    // Initialize brush textures for sumi-e rendering
+    brushTextures = new BrushTextures();
+    brushTextures.loadImages(brushTextureImages);
+    brushTextures.setP5Instance(window); // Enable tint caching for performance
+
+    // Initialize renderer with brush textures
+    renderer = new KoiRenderer(brushTextures);
 
     // Initialize parameters
     params = copyParams(DEFAULT_SHAPE_PARAMS);

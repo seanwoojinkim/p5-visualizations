@@ -12,6 +12,7 @@ import { DEFAULT_SHAPE_PARAMS } from '../core/koi-params.js';
 import { ControlPanel } from '../ui/control-panel.js';
 import { BrushTextures } from '../rendering/brush-textures.js';
 import { SVGParser } from '../core/svg-parser.js';
+import { RENDERING_CONFIG } from '../core/rendering-config.js';
 
 // Global state
 let flock;
@@ -30,13 +31,22 @@ let pectoralFinVertices = null;
 let dorsalFinVertices = null;
 let ventralFinVertices = null;
 
+// Brush texture images
+let brushTextureImages = {
+    body: null,
+    fin: null,
+    tail: null,
+    spots: [],  // Array of spot texture variations
+    paper: null
+};
+
 // Detect mobile/small screens and adjust defaults for performance
 const isMobile = window.innerWidth < 768 || /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 const isSmallScreen = window.innerWidth < 1024;
 
 // Parameters with device-specific defaults
 let params = {
-    pixelScale: isMobile ? 3 : (isSmallScreen ? 3 : 4),
+    pixelScale: isMobile ? 3 : (isSmallScreen ? 3 : 2),  // Changed from 4 to 2 for desktop
     numBoids: isMobile ? 30 : (isSmallScreen ? 50 : 80),
     maxSpeed: 0.5,
     maxForce: 0.1,
@@ -47,10 +57,14 @@ let params = {
     audioReactivity: 0.5
 };
 
+// Base size scale to compensate for pixelScale changes
+// When pixelScale=2 (desktop), we need 2x size to match the visual appearance of pixelScale=4
+const baseSizeScale = isMobile ? 1.0 : (isSmallScreen ? 1.0 : 2.0);
+
 // Log device-optimized settings
 const deviceType = isMobile ? 'Mobile' : (isSmallScreen ? 'Tablet' : 'Desktop');
 console.log(`🐟 Koi Flocking - ${deviceType} detected (${window.innerWidth}x${window.innerHeight})`);
-console.log(`   Optimized defaults: ${params.numBoids} koi, pixel scale ${params.pixelScale}`);
+console.log(`   Optimized defaults: ${params.numBoids} koi, pixel scale ${params.pixelScale}, base size scale ${baseSizeScale}x`);
 
 // Scatter mode is now handled inside each boid
 
@@ -60,6 +74,23 @@ let debugVectors = false;
 // p5.js preload function (loads assets before setup)
 window.preload = async function() {
     backgroundImage = loadImage('assets/water-background.png');
+
+    // Load brush texture images (pre-processed for performance)
+    console.log('Loading brush texture images...');
+    brushTextureImages.body = loadImage('assets/koi/brushstrokes/body-processed.png');
+    brushTextureImages.fin = loadImage('assets/koi/brushstrokes/fin.png');
+    brushTextureImages.tail = loadImage('assets/koi/brushstrokes/tail.png');
+
+    // Load all spot texture variations (pre-processed for performance)
+    brushTextureImages.spots = [
+        loadImage('assets/koi/brushstrokes/spot-1-processed.png'),
+        loadImage('assets/koi/brushstrokes/spot-2-processed.png'),
+        loadImage('assets/koi/brushstrokes/spot-3-processed.png'),
+        loadImage('assets/koi/brushstrokes/spot-4-processed.png'),
+        loadImage('assets/koi/brushstrokes/spot-5-processed.png')
+    ];
+
+    brushTextureImages.paper = loadImage('assets/koi/brushstrokes/paper.png');
 
     // Load and parse all SVG body parts
     // Target dimensions match koi coordinate space for each part
@@ -163,7 +194,8 @@ window.setup = function() {
 
     // Initialize brush textures for sumi-e rendering
     brushTextures = new BrushTextures();
-    brushTextures.generate(createGraphics, random);
+    brushTextures.loadImages(brushTextureImages);
+    brushTextures.setP5Instance(window); // Enable tint caching for performance
 
     // Initialize koi renderer with brush textures
     renderer = new KoiRenderer(brushTextures);
@@ -239,12 +271,26 @@ function setupKeyboardControls() {
                 debugVectors = !debugVectors;
                 console.log('Debug vectors:', debugVectors ? 'ON' : 'OFF');
                 break;
+            case 't':
+                // Toggle textures on/off
+                RENDERING_CONFIG.textures.enabled = !RENDERING_CONFIG.textures.enabled;
+                console.log('Textures:', RENDERING_CONFIG.textures.enabled ? 'ON' : 'OFF');
+
+                // Update UI checkbox if control panel exists
+                const textureToggle = document.getElementById('texturesEnabled');
+                if (textureToggle) {
+                    textureToggle.checked = RENDERING_CONFIG.textures.enabled;
+                }
+                break;
         }
     });
 }
 
 // p5.js draw function
 window.draw = function() {
+    // Performance monitoring
+    const frameStartTime = performance.now();
+
     // Get audio data
     const audioData = audio.getAudioData();
 
@@ -293,7 +339,8 @@ window.draw = function() {
                 pattern: boid.pattern,
                 animationParams: {
                     waveTime,
-                    sizeScale: boid.sizeMultiplier,
+                    sizeScale: boid.sizeMultiplier * baseSizeScale,  // Apply base size scale for rendering
+                    waveAmplitudeScale: boid.sizeMultiplier,  // Wave amplitude uses natural size only (no baseSizeScale)
                     lengthMultiplier: boid.lengthMultiplier,
                     tailLength: boid.tailLength
                 },
@@ -302,6 +349,7 @@ window.draw = function() {
                     saturationBoost: audioData.treble * 10 * params.audioReactivity,
                     sizeScale: 1 + audioData.amplitude * 0.3 * params.audioReactivity
                 },
+                boidSeed: Math.floor(boid.animationOffset * 1000), // Use animation offset as consistent seed
                 svgVertices: {
                     body: bodyVertices,
                     tail: tailVertices,
@@ -354,6 +402,26 @@ window.draw = function() {
                 line(screenX, screenY, accEndX, accEndY);
             }
         }
+    }
+
+    // Performance monitoring
+    const frameEndTime = performance.now();
+    const frameTime = frameEndTime - frameStartTime;
+
+    // Log warning if frame time exceeds target (60fps = 16.67ms)
+    if (frameTime > 16.67) {
+        console.warn(`Frame time: ${frameTime.toFixed(2)}ms (target: 16.67ms for 60fps)`);
+    }
+
+    // Display frame time in debug mode
+    if (debugVectors) {
+        push();
+        fill(255);
+        noStroke();
+        textSize(14);
+        textAlign(LEFT, TOP);
+        text(`Frame: ${frameTime.toFixed(2)}ms (${Math.floor(1000 / frameTime)} fps)`, 10, 10);
+        pop();
     }
 };
 

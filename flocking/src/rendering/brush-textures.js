@@ -1,7 +1,8 @@
 /**
  * Brush Textures
- * Procedurally generate sumi-e brush textures for koi rendering
- * Textures are generated once on initialization and cached
+ * Loads sumi-e brush texture images for koi rendering
+ * Textures are loaded from PNG files in assets/koi/brushstrokes/
+ * Implements LRU cache for pre-tinted textures to improve performance
  */
 
 export class BrushTextures {
@@ -10,218 +11,179 @@ export class BrushTextures {
             body: null,
             fin: null,
             tail: null,
-            spot: null,
+            spots: [],  // Array of spot textures for variation
             paper: null
         };
         this.isReady = false;
+
+        // LRU cache for pre-tinted textures (performance optimization)
+        // Maps cache keys (texture+color+alpha+blendMode) to pre-tinted p5.Graphics
+        this.tintCache = new Map();
+        this.maxCacheSize = 200; // Limit cache to ~50MB (200 textures × 256KB avg)
+
+        // Cache hit/miss statistics for performance monitoring
+        this.cacheStats = {
+            hits: 0,
+            misses: 0,
+            evictions: 0
+        };
+
+        // Reference to p5 instance (needed for creating graphics buffers)
+        this.p5Instance = null;
     }
 
     /**
-     * Generate all brush textures
-     * @param {Function} createGraphics - p5 createGraphics function
-     * @param {Function} random - p5 random function
+     * Load brush texture images (called after p5.loadImage)
+     * Textures are pre-processed offline with brightness → alpha conversion for performance
+     * @param {Object} loadedImages - Object containing preloaded p5.Image objects
      */
-    generate(createGraphics, random) {
-        console.log('🖌️ Generating sumi-e brush textures...');
+    loadImages(loadedImages) {
+        console.log('🖌️ Loading sumi-e brush textures...');
 
-        this.textures.body = this.generateBodyBrush(createGraphics, random);
-        this.textures.fin = this.generateFinBrush(createGraphics, random);
-        this.textures.tail = this.generateTailBrush(createGraphics, random);
-        this.textures.spot = this.generateSpotBrush(createGraphics, random);
-        this.textures.paper = this.generatePaperGrain(createGraphics, random);
+        // Load pre-processed textures (brightness already converted to alpha offline)
+        this.textures.body = loadedImages.body;
+        this.textures.fin = loadedImages.fin;
+        this.textures.tail = loadedImages.tail;
+
+        // Load pre-processed spot textures
+        this.textures.spots = loadedImages.spots;
+
+        this.textures.paper = loadedImages.paper;
 
         this.isReady = true;
-        console.log('✓ Brush textures generated');
+        console.log(`✓ Brush textures loaded (${this.textures.spots.length} spot variations, pre-processed)`);
     }
 
     /**
-     * Generate body brush texture (512×256)
-     * Horizontal flowing strokes with fiber detail
+     * Set p5 instance reference (needed for creating graphics buffers for caching)
+     * Call this during setup() after p5 is initialized
+     * @param {Object} p5 - p5.js instance
      */
-    generateBodyBrush(createGraphics, random) {
-        const pg = createGraphics(512, 256);
-        pg.background(255);
-        pg.noStroke();
-
-        // Create flowing horizontal brush strokes with fiber texture
-        // Much lighter for subtle effect
-        for (let i = 0; i < 400; i++) {
-            const x = random(0, 512);
-            const y = random(0, 256);
-            const len = random(20, 80);
-            const thickness = random(1, 4);
-            const alpha = random(5, 35); // Reduced from 30-150
-
-            pg.fill(0, alpha);
-            pg.ellipse(x, y, len, thickness);
-        }
-
-        // Add fiber detail - very subtle
-        for (let i = 0; i < 800; i++) {
-            const x = random(0, 512);
-            const y = random(0, 256);
-            const alpha = random(3, 20); // Reduced from 10-60
-            pg.fill(0, alpha);
-            pg.ellipse(x, y, random(1, 3), random(0.5, 2));
-        }
-
-        // Add noise for organic texture
-        pg.loadPixels();
-        for (let i = 0; i < pg.pixels.length; i += 4) {
-            const noise = random(-15, 15);
-            pg.pixels[i] = Math.max(0, Math.min(255, pg.pixels[i] + noise));
-            pg.pixels[i + 1] = Math.max(0, Math.min(255, pg.pixels[i + 1] + noise));
-            pg.pixels[i + 2] = Math.max(0, Math.min(255, pg.pixels[i + 2] + noise));
-        }
-        pg.updatePixels();
-
-        return pg;
+    setP5Instance(p5) {
+        this.p5Instance = p5;
     }
 
     /**
-     * Generate fin brush texture (256×128)
-     * Delicate, wispy strokes
+     * Get a pre-tinted spot texture (with LRU caching for performance)
+     * @param {number} spotIndex - Which spot texture (0-4)
+     * @param {Object} color - {h, s, b} HSB color to tint to
+     * @param {number} alpha - Alpha value (0-255)
+     * @param {string} blendMode - Blend mode ('BLEND' or 'MULTIPLY')
+     * @returns {p5.Image|p5.Graphics} - Pre-tinted texture (or original if caching disabled)
      */
-    generateFinBrush(createGraphics, random) {
-        const pg = createGraphics(256, 128);
-        pg.background(255);
-        pg.noStroke();
-
-        // Delicate, wispy strokes for fins - very light
-        for (let i = 0; i < 150; i++) {
-            const x = random(0, 256);
-            const y = random(0, 128);
-            const len = random(10, 40);
-            const thickness = random(0.5, 2);
-            const alpha = random(5, 30); // Reduced from 20-100
-
-            pg.fill(0, alpha);
-            pg.ellipse(x, y, len, thickness);
+    getTintedSpot(spotIndex, color, alpha, blendMode = 'MULTIPLY') {
+        if (!this.p5Instance || !this.textures.spots[spotIndex]) {
+            // Caching not available, return original texture
+            return this.textures.spots[spotIndex];
         }
 
-        // Subtle fiber detail
-        for (let i = 0; i < 250; i++) {
-            const x = random(0, 256);
-            const y = random(0, 128);
-            const alpha = random(2, 15); // Reduced from 5-40
-            pg.fill(0, alpha);
-            pg.ellipse(x, y, random(1, 2), random(0.3, 1));
+        // Create cache key from parameters (rounded to reduce unique keys)
+        // Round h to nearest 5°, s and b to nearest 5%
+        const h = Math.round(color.h / 5) * 5;
+        const s = Math.round(color.s / 5) * 5;
+        const b = Math.round(color.b / 5) * 5;
+        const a = Math.round(alpha / 10) * 10; // Round to nearest 10
+        const cacheKey = `spot_${spotIndex}_${h}_${s}_${b}_${a}_${blendMode}`;
+
+        // Check cache (LRU: move to end if found)
+        if (this.tintCache.has(cacheKey)) {
+            const cached = this.tintCache.get(cacheKey);
+            // Move to end (most recently used)
+            this.tintCache.delete(cacheKey);
+            this.tintCache.set(cacheKey, cached);
+            this.cacheStats.hits++;
+            return cached;
         }
 
-        return pg;
+        // Cache miss: create tinted texture
+        this.cacheStats.misses++;
+
+        const sourceTexture = this.textures.spots[spotIndex];
+        const tinted = this.p5Instance.createGraphics(sourceTexture.width, sourceTexture.height);
+
+        tinted.push();
+        tinted.colorMode(tinted.HSB);
+        tinted.tint(color.h, color.s, color.b, alpha);
+        tinted.blendMode(tinted[blendMode]);
+        tinted.image(sourceTexture, 0, 0);
+        tinted.noTint();
+        tinted.pop();
+
+        // Evict oldest entry if cache is full (LRU)
+        if (this.tintCache.size >= this.maxCacheSize) {
+            const firstKey = this.tintCache.keys().next().value;
+            const removed = this.tintCache.get(firstKey);
+            removed.remove(); // Free p5 graphics memory
+            this.tintCache.delete(firstKey);
+            this.cacheStats.evictions++;
+        }
+
+        // Add to cache
+        this.tintCache.set(cacheKey, tinted);
+        return tinted;
     }
 
     /**
-     * Generate tail brush texture (512×128)
-     * Flowing, dynamic strokes
+     * Clear the tint cache (useful for memory management)
      */
-    generateTailBrush(createGraphics, random) {
-        const pg = createGraphics(512, 128);
-        pg.background(255);
-        pg.noStroke();
-
-        // Flowing, dynamic strokes for tail - lighter
-        for (let i = 0; i < 300; i++) {
-            const x = random(0, 512);
-            const y = random(0, 128);
-            const len = random(30, 120);
-            const thickness = random(1, 5);
-            const alpha = random(5, 40); // Reduced from 25-140
-
-            pg.fill(0, alpha);
-            pg.ellipse(x, y, len, thickness);
+    clearTintCache() {
+        for (let [key, graphics] of this.tintCache.entries()) {
+            graphics.remove(); // Free p5 graphics memory
         }
-
-        // Add flowing detail - subtle
-        for (let i = 0; i < 500; i++) {
-            const x = random(0, 512);
-            const y = random(0, 128);
-            const alpha = random(3, 20); // Reduced from 10-50
-            pg.fill(0, alpha);
-            pg.ellipse(x, y, random(2, 5), random(0.5, 2));
-        }
-
-        return pg;
+        this.tintCache.clear();
+        console.log('✓ Tint cache cleared');
     }
 
     /**
-     * Generate spot brush texture (256×256)
-     * Organic circular texture with soft edges
+     * Get cache statistics for performance monitoring
+     * @returns {Object} - {hits, misses, evictions, size, hitRate}
      */
-    generateSpotBrush(createGraphics, random) {
-        const pg = createGraphics(256, 256);
-        pg.background(255);
-        pg.noStroke();
+    getCacheStats() {
+        const total = this.cacheStats.hits + this.cacheStats.misses;
+        const hitRate = total > 0 ? ((this.cacheStats.hits / total) * 100).toFixed(1) : 0;
 
-        // Organic spot texture with soft edges - very subtle
-        const centerX = 128;
-        const centerY = 128;
-
-        for (let i = 0; i < 300; i++) {
-            const angle = random(0, Math.PI * 2);
-            const radius = random(0, 80);
-            const x = centerX + Math.cos(angle) * radius;
-            const y = centerY + Math.sin(angle) * radius;
-            const size = random(3, 15);
-            const alpha = random(5, 40) * (1 - radius / 80); // Reduced from 40-150
-
-            pg.fill(0, alpha);
-            pg.ellipse(x, y, size, size);
-        }
-
-        return pg;
-    }
-
-    /**
-     * Generate paper grain texture (1024×1024)
-     * Fine paper texture for background overlay
-     */
-    generatePaperGrain(createGraphics, random) {
-        const pg = createGraphics(1024, 1024);
-        pg.background(255);
-        pg.noStroke();
-
-        // Fine paper grain texture
-        for (let i = 0; i < 8000; i++) {
-            const x = random(0, 1024);
-            const y = random(0, 1024);
-            const size = random(0.5, 2);
-            const alpha = random(5, 25);
-
-            pg.fill(0, alpha);
-            pg.ellipse(x, y, size, size);
-        }
-
-        // Add subtle fiber patterns
-        for (let i = 0; i < 2000; i++) {
-            const x = random(0, 1024);
-            const y = random(0, 1024);
-            const len = random(2, 8);
-            const alpha = random(3, 15);
-
-            pg.fill(0, alpha);
-            pg.ellipse(x, y, len, 1);
-        }
-
-        // Gentle noise
-        pg.loadPixels();
-        for (let i = 0; i < pg.pixels.length; i += 4) {
-            const noise = random(-8, 8);
-            pg.pixels[i] = Math.max(0, Math.min(255, pg.pixels[i] + noise));
-            pg.pixels[i + 1] = Math.max(0, Math.min(255, pg.pixels[i + 1] + noise));
-            pg.pixels[i + 2] = Math.max(0, Math.min(255, pg.pixels[i + 2] + noise));
-        }
-        pg.updatePixels();
-
-        return pg;
+        return {
+            ...this.cacheStats,
+            size: this.tintCache.size,
+            hitRate: `${hitRate}%`
+        };
     }
 
     /**
      * Get a texture by name
-     * @param {string} name - Texture name (body, fin, tail, spot, paper)
-     * @returns {Object} - p5 graphics object
+     * @param {string} name - Texture name (body, fin, tail, spots, paper)
+     * @returns {Object} - p5 graphics object (or array for 'spots')
      */
     get(name) {
         return this.textures[name];
+    }
+
+    /**
+     * Get a random spot texture
+     * @param {number} seed - Optional seed for consistent random selection (e.g., boid ID)
+     * @returns {Object} - p5 Image object
+     */
+    getRandomSpot(seed) {
+        if (!this.textures.spots || this.textures.spots.length === 0) {
+            return null;
+        }
+
+        if (seed !== undefined) {
+            // Use seed for consistent selection per koi
+            const index = Math.floor(seed) % this.textures.spots.length;
+            return this.textures.spots[index];
+        } else {
+            // Truly random
+            const index = Math.floor(Math.random() * this.textures.spots.length);
+            return this.textures.spots[index];
+        }
+    }
+
+    /**
+     * Get the number of available spot textures
+     * @returns {number}
+     */
+    getSpotCount() {
+        return this.textures.spots ? this.textures.spots.length : 0;
     }
 }

@@ -3,11 +3,14 @@
  * Handles UI controls for the simulation
  */
 
+import { RENDERING_CONFIG } from '../core/rendering-config.js';
+
 export class ControlPanel {
     constructor(params, callbacks) {
         this.params = params;
         this.callbacks = callbacks;
         this.initializeValues();
+        this.loadTextureConfig();
         this.setupListeners();
     }
 
@@ -18,6 +21,59 @@ export class ControlPanel {
 
         document.getElementById('boidCountValue').textContent = this.params.numBoids;
         document.getElementById('boidCount').value = this.params.numBoids;
+    }
+
+    /**
+     * Load texture configuration from localStorage
+     */
+    loadTextureConfig() {
+        try {
+            const saved = localStorage.getItem('koi-texture-config');
+            if (!saved) return;
+
+            const config = JSON.parse(saved);
+
+            // Apply to RENDERING_CONFIG
+            RENDERING_CONFIG.textures.enabled = config.enabled ?? true;
+            RENDERING_CONFIG.textures.paper.enabled = config.paper ?? true;
+            RENDERING_CONFIG.textures.body.enabled = config.body ?? true;
+            RENDERING_CONFIG.textures.tail.enabled = config.tail ?? true;
+            RENDERING_CONFIG.textures.fin.enabled = config.fin ?? true;
+            RENDERING_CONFIG.textures.spot.enabled = config.spot ?? false;
+
+            // Update UI checkboxes
+            document.getElementById('texturesEnabled').checked = config.enabled;
+            document.getElementById('paperTextureEnabled').checked = config.paper;
+            document.getElementById('bodyTextureEnabled').checked = config.body;
+            document.getElementById('tailTextureEnabled').checked = config.tail;
+            document.getElementById('finTextureEnabled').checked = config.fin;
+            document.getElementById('spotTextureEnabled').checked = config.spot;
+
+            console.log('Texture config loaded:', config);
+        } catch (e) {
+            console.warn('Failed to load texture config from localStorage:', e);
+        }
+    }
+
+    /**
+     * Save texture configuration to localStorage
+     */
+    saveTextureConfig() {
+        const config = {
+            enabled: RENDERING_CONFIG.textures.enabled,
+            paper: RENDERING_CONFIG.textures.paper.enabled,
+            body: RENDERING_CONFIG.textures.body.enabled,
+            tail: RENDERING_CONFIG.textures.tail.enabled,
+            fin: RENDERING_CONFIG.textures.fin.enabled,
+            spot: RENDERING_CONFIG.textures.spot.enabled
+        };
+
+        try {
+            localStorage.setItem('koi-texture-config', JSON.stringify(config));
+            console.log('Texture config saved:', config);
+        } catch (e) {
+            console.warn('Failed to save texture config to localStorage:', e);
+        }
     }
 
     setupListeners() {
@@ -97,6 +153,41 @@ export class ControlPanel {
             if (this.callbacks.onReset) {
                 this.callbacks.onReset();
             }
+        });
+
+        // Texture controls
+        // Master texture toggle
+        document.getElementById('texturesEnabled').addEventListener('change', (e) => {
+            RENDERING_CONFIG.textures.enabled = e.target.checked;
+            const textureControls = document.getElementById('textureDetailControls');
+            textureControls.style.opacity = e.target.checked ? 1 : 0.5;
+            this.saveTextureConfig();
+        });
+
+        // Individual texture toggles
+        document.getElementById('paperTextureEnabled').addEventListener('change', (e) => {
+            RENDERING_CONFIG.textures.paper.enabled = e.target.checked;
+            this.saveTextureConfig();
+        });
+
+        document.getElementById('bodyTextureEnabled').addEventListener('change', (e) => {
+            RENDERING_CONFIG.textures.body.enabled = e.target.checked;
+            this.saveTextureConfig();
+        });
+
+        document.getElementById('tailTextureEnabled').addEventListener('change', (e) => {
+            RENDERING_CONFIG.textures.tail.enabled = e.target.checked;
+            this.saveTextureConfig();
+        });
+
+        document.getElementById('finTextureEnabled').addEventListener('change', (e) => {
+            RENDERING_CONFIG.textures.fin.enabled = e.target.checked;
+            this.saveTextureConfig();
+        });
+
+        document.getElementById('spotTextureEnabled').addEventListener('change', (e) => {
+            RENDERING_CONFIG.textures.spot.enabled = e.target.checked;
+            this.saveTextureConfig();
         });
     }
 

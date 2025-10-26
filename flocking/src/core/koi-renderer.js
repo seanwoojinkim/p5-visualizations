@@ -8,6 +8,26 @@ import { DEFAULT_SHAPE_PARAMS } from './koi-params.js';
 import { ANIMATION_CONFIG } from './animation-config.js';
 import { RENDERING_CONFIG } from './rendering-config.js';
 
+/**
+ * Brush Texture Rendering Constants
+ */
+const BRUSH_TEXTURE_CONFIG = {
+    // Spot rendering
+    SPOT_SIZE_MULTIPLIER: 1.5,          // Scale up spots now that clipping works
+    SPOT_SIZE_VARIATION_MIN: 0.8,       // Minimum random size variation
+    SPOT_SIZE_VARIATION_MAX: 1.2,       // Maximum random size variation
+    SPOT_ROTATION_VARIATION: 30,        // Degrees of random rotation (±)
+
+    // Adaptive opacity based on body brightness
+    DARK_FISH_THRESHOLD: 50,            // Brightness threshold for dark fish
+    DARK_FISH_SPOT_ALPHA: 140,          // Alpha for spots on dark fish (0-255)
+    LIGHT_FISH_SPOT_ALPHA: 180,         // Alpha for spots on light fish (0-255)
+
+    // Body texture
+    BODY_TEXTURE_ALPHA: 8,              // Opacity for body brush texture
+    BODY_TEXTURE_SCALE: 1.5,            // Scale multiplier for body texture
+};
+
 export class KoiRenderer {
     /**
      * Create a new koi renderer
@@ -82,8 +102,9 @@ export class KoiRenderer {
             shapeParams = DEFAULT_SHAPE_PARAMS,
             colorParams = { h: 0, s: 0, b: 90 },
             pattern = { spots: [] },
-            animationParams = { waveTime: 0, sizeScale: 1, lengthMultiplier: 1, tailLength: 1 },
+            animationParams = { waveTime: 0, sizeScale: 1, lengthMultiplier: 1, tailLength: 1, waveAmplitudeScale: 1 },
             modifiers = { brightnessBoost: 0, saturationBoost: 0, sizeScale: 1 },
+            boidSeed = 0,
             svgVertices = {
                 body: null,
                 tail: null,
@@ -94,7 +115,7 @@ export class KoiRenderer {
             }
         } = params;
 
-        const { waveTime, sizeScale, lengthMultiplier = 1, tailLength = 1 } = animationParams;
+        const { waveTime, sizeScale, lengthMultiplier = 1, tailLength = 1, waveAmplitudeScale = 1 } = animationParams;
         const { brightnessBoost = 0, saturationBoost = 0, sizeScale: modifierSizeScale = 1 } = modifiers;
 
         // Apply modifier size scaling
@@ -106,7 +127,8 @@ export class KoiRenderer {
             waveTime,
             finalSizeScale,
             lengthMultiplier,
-            shapeParams
+            shapeParams,
+            waveAmplitudeScale  // Separate wave amplitude scaling from size scaling
         );
 
         // Save graphics state
@@ -133,7 +155,7 @@ export class KoiRenderer {
             dorsalFin: null, // Don't draw dorsal fin yet
             ventralFin: svgVertices.ventralFin
         });
-        this.drawTail(context, segmentPositions, shapeParams, waveTime, finalSizeScale, tailLength, hue, saturation, brightness, svgVertices.tail);
+        this.drawTail(context, segmentPositions, shapeParams, waveTime, finalSizeScale, tailLength, hue, saturation, brightness, svgVertices.tail, waveAmplitudeScale);
 
         // Use SVG body if vertices provided, otherwise use procedural body
         if (svgVertices.body && svgVertices.body.length > 0) {
@@ -143,7 +165,13 @@ export class KoiRenderer {
         }
 
         this.drawHead(context, segmentPositions[0], shapeParams, finalSizeScale, hue, saturation, brightness, svgVertices.head);
-        this.drawSpots(context, segmentPositions, pattern.spots || [], finalSizeScale);
+
+        // Clip body texture and spots to body+head outline for cleaner appearance
+        // Single clipping region shared by both operations (performance optimization)
+        this.clipToBodyAndHead(context, segmentPositions, svgVertices, shapeParams, finalSizeScale);
+        this.applyBodyTexture(context, segmentPositions, shapeParams, finalSizeScale, hue, saturation, brightness, svgVertices);
+        this.drawSpots(context, segmentPositions, pattern.spots || [], finalSizeScale, boidSeed, angle, brightness);
+        context.drawingContext.restore(); // Remove clip
 
         // Draw dorsal fin last so it appears on top of the body
         this.drawFins(context, segmentPositions, shapeParams, waveTime, finalSizeScale, hue, saturation, brightness, {
@@ -160,14 +188,15 @@ export class KoiRenderer {
     /**
      * Calculate body segment positions with swimming wave motion
      */
-    calculateSegments(numSegments, waveTime, sizeScale, lengthMultiplier, shapeParams = DEFAULT_SHAPE_PARAMS) {
+    calculateSegments(numSegments, waveTime, sizeScale, lengthMultiplier, shapeParams = DEFAULT_SHAPE_PARAMS, waveAmplitudeScale = 1.0) {
         const segments = [];
 
         for (let i = 0; i < numSegments; i++) {
             const t = i / numSegments;
             const x = this.lerp(7, -9, t) * sizeScale * lengthMultiplier;
+            // Wave amplitude uses separate scaling to avoid exaggerated motion when rendering at larger sizes
             const y = Math.sin(waveTime - t * ANIMATION_CONFIG.wave.phaseGradient) *
-                      ANIMATION_CONFIG.wave.amplitude * sizeScale *
+                      ANIMATION_CONFIG.wave.amplitude * waveAmplitudeScale *
                       (1 - t * ANIMATION_CONFIG.wave.dampening);
 
             // Calculate width based on position using new parameters
@@ -466,7 +495,7 @@ export class KoiRenderer {
      * @param {number} saturation - HSB saturation
      * @param {number} brightness - HSB brightness
      */
-    drawTailFromSVG(context, segmentPositions, svgVertices, shapeParams, waveTime, sizeScale, tailLength, hue, saturation, brightness) {
+    drawTailFromSVG(context, segmentPositions, svgVertices, shapeParams, waveTime, sizeScale, tailLength, hue, saturation, brightness, waveAmplitudeScale = 1.0) {
         const tailBase = segmentPositions[segmentPositions.length - 1];
         const tailStartX = tailBase.x + shapeParams.tailStartX * sizeScale;
 
@@ -491,7 +520,7 @@ export class KoiRenderer {
             // But adjust t to continue from where body left off
             const waveT = 1 + (t * 0.5); // Continue wave beyond body end (t=1)
             const y = Math.sin(waveTime - waveT * ANIMATION_CONFIG.wave.phaseGradient) *
-                      ANIMATION_CONFIG.wave.amplitude * sizeScale *
+                      ANIMATION_CONFIG.wave.amplitude * waveAmplitudeScale *
                       (1 - waveT * ANIMATION_CONFIG.wave.dampening);
             tailSegments.push({ x, y, w: 0 });
         }
@@ -518,10 +547,10 @@ export class KoiRenderer {
      * Draw tail with flowing motion
      * Uses SVG if vertices provided, otherwise uses procedural rendering
      */
-    drawTail(context, segmentPositions, shapeParams, waveTime, sizeScale, tailLength, hue, saturation, brightness, svgVertices = null) {
+    drawTail(context, segmentPositions, shapeParams, waveTime, sizeScale, tailLength, hue, saturation, brightness, svgVertices = null, waveAmplitudeScale = 1.0) {
         // Use SVG if provided, otherwise procedural
         if (svgVertices && svgVertices.length > 0) {
-            this.drawTailFromSVG(context, segmentPositions, svgVertices, shapeParams, waveTime, sizeScale, tailLength, hue, saturation, brightness);
+            this.drawTailFromSVG(context, segmentPositions, svgVertices, shapeParams, waveTime, sizeScale, tailLength, hue, saturation, brightness, waveAmplitudeScale);
             return;
         }
 
@@ -1007,38 +1036,231 @@ export class KoiRenderer {
     }
 
     /**
-     * Draw spot pattern on body
+     * Apply body brush texture as a stamp over the body
+     * Approach 1: Texture as stamp scaled to body dimensions
+     * Uses the same clipping as spots for consistency
      */
-    drawSpots(context, segmentPositions, spots, sizeScale) {
-        for (let spot of spots) {
+    applyBodyTexture(context, segmentPositions, shapeParams, sizeScale, hue, saturation, brightness, svgVertices) {
+        if (!this.brushTextures || !this.brushTextures.isReady) {
+            return; // No textures available
+        }
+
+        const bodyTexture = this.brushTextures.get('body');
+        if (!bodyTexture) {
+            return; // No body texture available
+        }
+
+        // Calculate body bounds
+        const firstSeg = segmentPositions[0];
+        const lastSeg = segmentPositions[segmentPositions.length - 1];
+
+        // Body extends from head to tail
+        const bodyWidth = Math.abs(firstSeg.x - lastSeg.x);
+        const bodyHeight = Math.max(...segmentPositions.map(s => s.w));
+
+        // Center position (middle of body)
+        const centerX = (firstSeg.x + lastSeg.x) / 2;
+        const centerY = 0;
+
+        // Assumes clipping region already established by caller (render method)
+        // This avoids duplicate expensive clipping operations
+        context.push();
+        context.translate(centerX, centerY);
+
+        // Apply color tint (use body color)
+        context.colorMode(context.HSB);
+        context.tint(hue, saturation, brightness, BRUSH_TEXTURE_CONFIG.BODY_TEXTURE_ALPHA);
+
+        // Use MULTIPLY for integration with body color
+        context.blendMode(context.MULTIPLY);
+
+        // Draw texture scaled to body size
+        context.imageMode(context.CENTER);
+        const textureWidth = bodyWidth * BRUSH_TEXTURE_CONFIG.BODY_TEXTURE_SCALE;
+        const textureHeight = bodyHeight * BRUSH_TEXTURE_CONFIG.BODY_TEXTURE_SCALE;
+        context.image(bodyTexture, 0, 0, textureWidth, textureHeight);
+
+        context.noTint();
+        context.pop();
+    }
+
+    /**
+     * Create a clipping path for body and head to constrain spots
+     */
+    clipToBodyAndHead(context, segmentPositions, svgVertices, shapeParams, sizeScale) {
+        const ctx = context.drawingContext;
+        ctx.save();
+        ctx.beginPath();
+
+        // Create body outline path
+        if (svgVertices.body && svgVertices.body.length > 0) {
+            // Use SVG body outline
+            const bodyOutline = this.calculateSVGOutline(svgVertices.body, segmentPositions, sizeScale);
+            ctx.moveTo(bodyOutline[0].x, bodyOutline[0].y);
+            for (let i = 1; i < bodyOutline.length; i++) {
+                ctx.lineTo(bodyOutline[i].x, bodyOutline[i].y);
+            }
+            ctx.closePath();
+        } else {
+            // Use procedural body outline
+            // Top edge
+            for (let i = 0; i < segmentPositions.length; i++) {
+                const seg = segmentPositions[i];
+                const topY = seg.y - seg.w * 0.48;
+                if (i === 0) {
+                    ctx.moveTo(seg.x, topY);
+                } else {
+                    ctx.lineTo(seg.x, topY);
+                }
+            }
+            // Bottom edge (reverse)
+            for (let i = segmentPositions.length - 1; i >= 0; i--) {
+                const seg = segmentPositions[i];
+                const bottomY = seg.y + seg.w * 0.48;
+                ctx.lineTo(seg.x, bottomY);
+            }
+            ctx.closePath();
+        }
+
+        // Add head outline to clip path
+        if (svgVertices.head && svgVertices.head.length > 0) {
+            const headPos = segmentPositions[0];
+            const headOffsetX = shapeParams.headX * sizeScale;
+
+            ctx.moveTo(headPos.x + headOffsetX + svgVertices.head[0].x * sizeScale,
+                      headPos.y + svgVertices.head[0].y * sizeScale);
+            for (let i = 1; i < svgVertices.head.length; i++) {
+                const v = svgVertices.head[i];
+                ctx.lineTo(headPos.x + headOffsetX + v.x * sizeScale,
+                          headPos.y + v.y * sizeScale);
+            }
+            ctx.closePath();
+        } else {
+            // Add procedural head ellipse to clip
+            const headPos = segmentPositions[0];
+            const headOffsetX = shapeParams.headX * sizeScale;
+            const headWidth = shapeParams.headWidth * sizeScale;
+            const headHeight = shapeParams.headHeight * sizeScale;
+
+            ctx.ellipse(
+                headPos.x + headOffsetX,
+                headPos.y,
+                headWidth / 2,
+                headHeight / 2,
+                0, 0, Math.PI * 2
+            );
+        }
+
+        ctx.clip();
+    }
+
+    /**
+     * Calculate SVG outline vertices for clipping
+     */
+    calculateSVGOutline(svgVertices, segmentPositions, sizeScale) {
+        // Apply the same wave deformation as drawBodyFromSVG to match animated body
+        const deformedVertices = this.applyWaveDeformation(svgVertices, {
+            segmentPositions,
+            numSegments: segmentPositions.length
+        });
+
+        // Then scale the deformed vertices to world space
+        return deformedVertices.map(vertex => ({
+            x: vertex.x * sizeScale,
+            y: vertex.y * sizeScale
+        }));
+    }
+
+    /**
+     * Draw spot pattern on body using brush texture stamps
+     * @param {number} bodyBrightness - Body color brightness (0-100) for adaptive blend mode
+     */
+    drawSpots(context, segmentPositions, spots, sizeScale, boidSeed = 0, koiAngle = 0, bodyBrightness = 50) {
+        if (!this.brushTextures || !this.brushTextures.isReady) {
+            // Fallback to simple ellipses if textures not available
+            for (let spot of spots) {
+                if (spot.segment >= segmentPositions.length) continue;
+                const seg = segmentPositions[spot.segment];
+                context.fill(spot.color.h, spot.color.s, spot.color.b, 1.0);
+                const spotSize = spot.size * sizeScale * BRUSH_TEXTURE_CONFIG.SPOT_SIZE_MULTIPLIER;
+                context.ellipse(
+                    seg.x,
+                    seg.y + spot.offsetY * sizeScale,
+                    spotSize,
+                    spotSize * 0.8
+                );
+            }
+            return;
+        }
+
+        // Use brush texture stamps for authentic sumi-e spots
+        // Get spot count to check if textures are available
+        const spotCount = this.brushTextures.getSpotCount();
+        if (spotCount === 0) {
+            // Fallback to ellipses if no spot textures available
+            for (let spot of spots) {
+                if (spot.segment >= segmentPositions.length) continue;
+                const seg = segmentPositions[spot.segment];
+                context.fill(spot.color.h, spot.color.s, spot.color.b, 1.0);
+                const spotSize = spot.size * sizeScale * BRUSH_TEXTURE_CONFIG.SPOT_SIZE_MULTIPLIER;
+                context.ellipse(
+                    seg.x,
+                    seg.y + spot.offsetY * sizeScale,
+                    spotSize,
+                    spotSize * 0.8
+                );
+            }
+            return;
+        }
+
+        for (let spotIndex = 0; spotIndex < spots.length; spotIndex++) {
+            const spot = spots[spotIndex];
             if (spot.segment >= segmentPositions.length) continue;
 
             const seg = segmentPositions[spot.segment];
-            const spotW = spot.size * sizeScale;
-            const spotH = spot.size * sizeScale * 0.8;
+            // Scale up spot size now that clipping keeps them within body boundaries
+            const spotSize = spot.size * sizeScale * BRUSH_TEXTURE_CONFIG.SPOT_SIZE_MULTIPLIER;
             const spotX = seg.x;
             const spotY = seg.y + spot.offsetY * sizeScale;
 
-            // For sumi-e style, draw multiple layers for soft, organic spot edges
-            if (this.useSumieStyle) {
-                for (let layer = 0; layer < 3; layer++) {
-                    const offset = (layer - 1) * 0.2;
-                    const sizeVariation = 1 + (layer - 1) * 0.1; // Slight size variation
-                    const opacity = layer === 1 ? 0.75 : 0.3;
+            // Generate deterministic random values for this specific spot
+            // Using boidSeed + spotIndex for consistency across frames
+            const randomSeed = (boidSeed * 1000 + spotIndex * 137) % 10000;
 
-                    context.fill(spot.color.h, spot.color.s, spot.color.b, opacity);
-                    context.ellipse(
-                        spotX + offset,
-                        spotY + offset,
-                        spotW * sizeVariation,
-                        spotH * sizeVariation
-                    );
-                }
-            } else {
-                // Normal rendering
-                context.fill(spot.color.h, spot.color.s, spot.color.b, 1.0);
-                context.ellipse(spotX, spotY, spotW, spotH);
-            }
+            // Determine which spot texture to use (deterministic per spot)
+            const spotTextureIndex = Math.floor(randomSeed) % this.brushTextures.getSpotCount();
+
+            // Mostly aligned with slight variation: ±SPOT_ROTATION_VARIATION degrees
+            const rotationVariation = ((randomSeed % (BRUSH_TEXTURE_CONFIG.SPOT_ROTATION_VARIATION * 2)) - BRUSH_TEXTURE_CONFIG.SPOT_ROTATION_VARIATION) * (Math.PI / 180);
+            const randomRotation = rotationVariation;
+            const randomSizeVariation = BRUSH_TEXTURE_CONFIG.SPOT_SIZE_VARIATION_MIN +
+                ((randomSeed % 100) / 100) * (BRUSH_TEXTURE_CONFIG.SPOT_SIZE_VARIATION_MAX - BRUSH_TEXTURE_CONFIG.SPOT_SIZE_VARIATION_MIN);
+
+            // Adaptive alpha and blend mode based on body brightness
+            // Dark fish: Lower alpha for better blending, BLEND mode for visibility
+            // Light fish: Higher alpha, MULTIPLY for watercolor integration
+            const spotAlpha = bodyBrightness < BRUSH_TEXTURE_CONFIG.DARK_FISH_THRESHOLD
+                ? BRUSH_TEXTURE_CONFIG.DARK_FISH_SPOT_ALPHA
+                : BRUSH_TEXTURE_CONFIG.LIGHT_FISH_SPOT_ALPHA;
+            const blendMode = bodyBrightness < BRUSH_TEXTURE_CONFIG.DARK_FISH_THRESHOLD ? 'BLEND' : 'MULTIPLY';
+
+            // Get pre-tinted texture from cache (performance optimization)
+            // This eliminates expensive per-frame tinting operations
+            const tintedSpot = this.brushTextures.getTintedSpot(spotTextureIndex, spot.color, spotAlpha, blendMode);
+
+            context.push();
+            context.translate(spotX, spotY);
+            // Rotate 180° to flip brush direction (head-to-tail), plus random variation
+            context.rotate(Math.PI + randomRotation);
+
+            // Draw pre-tinted brush texture stamp with random size variation
+            // No runtime tinting needed - texture is already colored and cached
+            context.imageMode(context.CENTER);
+            const finalSpotWidth = spotSize * randomSizeVariation;
+            const finalSpotHeight = spotSize * 0.8 * randomSizeVariation;
+            context.image(tintedSpot, 0, 0, finalSpotWidth, finalSpotHeight);
+
+            context.pop();
         }
     }
 

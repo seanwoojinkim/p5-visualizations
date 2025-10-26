@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Visualizations</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #0a0a0a;
+            color: #e0e0e0;
+        }
+        h1 {
+            color: #6ac0ff;
+            margin-bottom: 10px;
+        }
+        .subtitle {
+            color: #888;
+            margin-bottom: 40px;
+        }
+        .viz-card {
+            background: #1a1a1a;
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 25px;
+            margin-bottom: 20px;
+            transition: all 0.2s;
+        }
+        .viz-card:hover {
+            border-color: #6ac0ff;
+            background: #222;
+        }
+        .viz-card h2 {
+            margin: 0 0 10px 0;
+            color: #6ac0ff;
+        }
+        .viz-card p {
+            margin: 0 0 15px 0;
+            color: #aaa;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+        .viz-card a {
+            display: inline-block;
+            color: #6ac0ff;
+            text-decoration: none;
+            padding: 8px 16px;
+            border: 1px solid #6ac0ff;
+            border-radius: 4px;
+            margin-right: 10px;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+        .viz-card a:hover {
+            background: #6ac0ff;
+            color: #0a0a0a;
+        }
+        .status {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 3px;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-left: 10px;
+        }
+        .status.ready {
+            background: #1a4d2e;
+            color: #4ade80;
+        }
+        .status.wip {
+            background: #4a3f1a;
+            color: #fbbf24;
+        }
+    </style>
+</head>
+<body>
+    <h1>🎨 Interactive Visualizations</h1>
+    <p class="subtitle">Collection of generative art and biometric experiments</p>
+
+    <div class="viz-card">
+        <h2>
+            Flocking Simulation
+            <span class="status ready">Ready</span>
+        </h2>
+        <p>
+            Koi fish flocking simulation with SVG rendering, brush textures, and audio reactivity.
+            Features organic movement patterns, watercolor aesthetics, and real-time parameter control.
+        </p>
+        <a href="/flocking/index.html">Launch Simulation</a>
+        <a href="/flocking/koi-editor.html">Koi Editor</a>
+    </div>
+
+    <div class="viz-card">
+        <h2>
+            Biometric Coherence
+            <span class="status ready">Ready</span>
+        </h2>
+        <p>
+            Two-group boid system visualizing interpersonal coherence. Demonstrates transition
+            from repulsion to synchronized movement based on biometric data simulation.
+        </p>
+        <a href="/coherence/index.html">Launch Visualization</a>
+    </div>
+
+    <div class="viz-card">
+        <h2>Server Info</h2>
+        <p style="font-family: 'Courier New', monospace; font-size: 12px; color: #888;">
+            <strong>Container:</strong> http://localhost:8000<br>
+            <strong>Host:</strong> http://localhost:8123<br>
+            <strong>Current URL:</strong> <span id="currentUrl"></span>
+        </p>
+    </div>
+
+    <script>
+        document.getElementById('currentUrl').textContent = window.location.href;
+    </script>
+</body>
+</html>
