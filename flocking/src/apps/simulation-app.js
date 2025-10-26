@@ -420,7 +420,8 @@ window.draw = function() {
         noStroke();
         textSize(14);
         textAlign(LEFT, TOP);
-        text(`Frame: ${frameTime.toFixed(2)}ms (${Math.floor(1000 / frameTime)} fps)`, 10, 10);
+        // Use p5's built-in frameRate() for accurate averaged FPS instead of instantaneous calculation
+        text(`Frame: ${frameTime.toFixed(2)}ms (${Math.floor(frameRate())} fps)`, 10, 10);
         pop();
     }
 };
