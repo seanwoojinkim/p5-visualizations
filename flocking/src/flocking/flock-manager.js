@@ -134,9 +134,9 @@ export class FlockManager {
         alignment.mult(params.alignmentWeight);
         cohesion.mult(params.cohesionWeight);
 
-        // Bass makes them separate more - push away on bass hits (gentle)
-        const bassBoost = 1 + audioData.bass * 1.5 * params.audioReactivity;
-        separation.mult(params.separationWeight * bassBoost);
+        // Audio reactivity removed from separation physics for stability
+        // Audio effects are applied to visual parameters (brightness, saturation, size) instead
+        separation.mult(params.separationWeight);
 
         return {
             alignment,

@@ -1294,23 +1294,20 @@ export class KoiRenderer {
         const centerX = (firstSeg.x + lastSeg.x) / 2;
         const centerY = 0;
 
-        // Get pre-tinted texture from cache (performance optimization)
-        const tintedBody = this.brushTextures.getTintedBody(
-            { h: hue, s: saturation, b: brightness },
-            BRUSH_TEXTURE_CONFIG.BODY_TEXTURE_ALPHA
-        );
-
-        // Assumes clipping region already established by caller (render method)
-        // This avoids duplicate expensive clipping operations
+        // Use original texture to preserve dark brush areas (authentic sumi-e)
+        // Dark areas in the original brushstroke will appear as darker colors
+        // This creates more natural brush texture variation vs alpha-only approach
         context.push();
         context.translate(centerX, centerY);
 
-        // Draw pre-tinted texture with MULTIPLY blend mode
+        // Apply color tint and draw with MULTIPLY to preserve luminosity
+        context.tint(hue, saturation, brightness, BRUSH_TEXTURE_CONFIG.BODY_TEXTURE_ALPHA);
         context.blendMode(context.MULTIPLY);
         context.imageMode(context.CENTER);
         const textureWidth = bodyWidth * BRUSH_TEXTURE_CONFIG.BODY_TEXTURE_SCALE;
         const textureHeight = bodyHeight * BRUSH_TEXTURE_CONFIG.BODY_TEXTURE_SCALE;
-        context.image(tintedBody, 0, 0, textureWidth, textureHeight);
+        context.image(bodyTexture, 0, 0, textureWidth, textureHeight);
+        context.noTint();
 
         context.pop();
     }

@@ -122,7 +122,10 @@ export function calculateSeparation(boid, neighbors, perceptionRadius, maxSpeed,
             const minDist = 8;
             if (d < minDist) d = minDist;
 
-            diff.div(d * d); // Weight by distance
+            // Linear inverse distance (smoother than inverse square)
+            // Industry standard: Processing.org and Reynolds' original algorithm
+            diff.normalize();  // First normalize to unit vector
+            diff.div(d);       // Then divide by distance (not d²)
             steering.add(diff);
             total++;
         }

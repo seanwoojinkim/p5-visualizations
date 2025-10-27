@@ -49,8 +49,8 @@ let params = {
     pixelScale: isMobile ? 3 : (isSmallScreen ? 3 : 2),  // Changed from 4 to 2 for desktop
     numBoids: isMobile ? 30 : (isSmallScreen ? 50 : 80),
     maxSpeed: 0.5,
-    maxForce: 0.1,
-    separationWeight: 1.0,  // Increased from 0.5 for better spacing
+    maxForce: 0.05,  // Reduced from 0.1 for smoother steering (matches Processing standard)
+    separationWeight: 0.9,  // Linear inverse (1/d) forces allow higher separation without jerky movement
     alignmentWeight: 1.2,
     cohesionWeight: 1.0,
     trailAlpha: 40,
