@@ -13,6 +13,8 @@ import { ControlPanel } from '../ui/control-panel.js';
 import { BrushTextures } from '../rendering/brush-textures.js';
 import { SVGParser } from '../core/svg-parser.js';
 import { RENDERING_CONFIG } from '../core/rendering-config.js';
+import { LilypadManager } from '../environment/lilypad-manager.js';
+import { BlossomManager } from '../environment/blossom-manager.js';
 
 // Global state
 let flock;
@@ -22,6 +24,10 @@ let renderer;
 let controlPanel;
 let brushTextures;
 let backgroundImage;
+let lilypadManager;
+let lilypadImages = [];
+let blossomManager;
+let blossomImages = [];
 
 // SVG vertices for all koi body parts
 let bodyVertices = null;
@@ -46,8 +52,8 @@ const isSmallScreen = window.innerWidth < 1024;
 
 // Parameters with device-specific defaults
 let params = {
-    pixelScale: isMobile ? 3 : (isSmallScreen ? 3 : 2),  // Changed from 4 to 2 for desktop
-    numBoids: isMobile ? 30 : (isSmallScreen ? 50 : 80),
+    pixelScale: isMobile ? 2 : (isSmallScreen ? 2 : 2),  // Changed from 4 to 2 for desktop
+    numBoids: isMobile ? 20 : (isSmallScreen ? 50 : 80),
     maxSpeed: 0.5,
     maxForce: 0.05,  // Reduced from 0.1 for smoother steering (matches Processing standard)
     separationWeight: 0.9,  // Linear inverse (1/d) forces allow higher separation without jerky movement
@@ -58,8 +64,10 @@ let params = {
 };
 
 // Base size scale to compensate for pixelScale changes
-// When pixelScale=2 (desktop), we need 2x size to match the visual appearance of pixelScale=4
-const baseSizeScale = isMobile ? 1.0 : (isSmallScreen ? 1.0 : 2.0);
+// For koi: baseSizeScale equals pixelScale to properly compensate for buffer scaling
+// For lilypads/blossoms: baseline is pixelScale=2 (their base sizes were designed for that)
+const baseSizeScale = params.pixelScale;
+const environmentSizeScale = params.pixelScale / 2;  // Baseline: pixelScale=2 → scale=1.0
 
 // Log device-optimized settings
 const deviceType = isMobile ? 'Mobile' : (isSmallScreen ? 'Tablet' : 'Desktop');
@@ -91,6 +99,22 @@ window.preload = async function() {
     ];
 
     brushTextureImages.paper = loadImage('assets/koi/brushstrokes/paper.png');
+
+    // Load lilypad images
+    console.log('Loading lilypad images...');
+    lilypadImages = [
+        loadImage('assets/lilypad/lilypad-1.png'),
+        loadImage('assets/lilypad/lilypad-2.png'),
+        loadImage('assets/lilypad/lilypad-3.png')
+    ];
+
+    // Load blossom images
+    console.log('Loading blossom images...');
+    blossomImages = [
+        loadImage('assets/blossoms/blossom-1.png'),
+        loadImage('assets/blossoms/blossom-2.png'),
+        loadImage('assets/blossoms/blossom-3.png')
+    ];
 
     // Load and parse all SVG body parts
     // Target dimensions match koi coordinate space for each part
@@ -200,6 +224,39 @@ window.setup = function() {
     // Initialize koi renderer with brush textures
     renderer = new KoiRenderer(brushTextures);
 
+    // Initialize lilypad manager
+    // Create a few lilypads per screen (3-5 depending on screen size)
+    const lilypadCount = isMobile ? 3 : (isSmallScreen ? 4 : 5);
+    lilypadManager = new LilypadManager(
+        lilypadImages,
+        lilypadCount,
+        bufferDims.width,
+        bufferDims.height,
+        {
+            random: (...args) => random(...args),
+            createVector,
+            noise: (...args) => noise(...args)
+        }
+    );
+    lilypadManager.setSizeScale(environmentSizeScale);
+
+    // Initialize blossom manager
+    // Spawn new blossoms periodically (every 2 seconds at 60fps)
+    const blossomSpawnRate = 120;
+    const maxBlossoms = isMobile ? 10 : (isSmallScreen ? 12 : 15);
+    blossomManager = new BlossomManager(
+        blossomImages,
+        blossomSpawnRate,
+        maxBlossoms,
+        bufferDims.width,
+        bufferDims.height,
+        {
+            random: (...args) => random(...args),
+            createVector
+        }
+    );
+    blossomManager.setSizeScale(environmentSizeScale);
+
     // Initialize control panel
     controlPanel = new ControlPanel(params, {
         onAudioFileLoad: async (file) => {
@@ -214,6 +271,16 @@ window.setup = function() {
             const bufferDims = pixelBuffer.getDimensions();
             flock.width = bufferDims.width;
             flock.height = bufferDims.height;
+
+            // Update size scale for lilypads and blossoms
+            // environmentSizeScale uses pixelScale=2 as baseline (scale / 2)
+            const newEnvironmentSizeScale = scale / 2;
+            if (lilypadManager) {
+                lilypadManager.setSizeScale(newEnvironmentSizeScale);
+            }
+            if (blossomManager) {
+                blossomManager.setSizeScale(newEnvironmentSizeScale);
+            }
         },
         onBoidCountChange: (count) => {
             flock.resize(count);
@@ -362,6 +429,18 @@ window.draw = function() {
         );
     }
 
+    // Render lilypads on top of koi (after koi so they appear above)
+    if (lilypadManager) {
+        lilypadManager.update(frameCount);
+        lilypadManager.render(pg);
+    }
+
+    // Render blossoms on top of lilypads (falling petals should be most visible)
+    if (blossomManager) {
+        blossomManager.update(frameCount);
+        blossomManager.render(pg);
+    }
+
     // Scale up the low-res buffer to main canvas
     pixelBuffer.render(window, width, height);
 
@@ -430,6 +509,18 @@ window.draw = function() {
 window.windowResized = function() {
     resizeCanvas(windowWidth, windowHeight);
     pixelBuffer.resize(width, height);
+
+    // Resize lilypad manager
+    if (lilypadManager) {
+        const bufferDims = pixelBuffer.getDimensions();
+        lilypadManager.resize(bufferDims.width, bufferDims.height);
+    }
+
+    // Resize blossom manager
+    if (blossomManager) {
+        const bufferDims = pixelBuffer.getDimensions();
+        blossomManager.resize(bufferDims.width, bufferDims.height);
+    }
 };
 
 // Hot Module Replacement (HMR) cleanup

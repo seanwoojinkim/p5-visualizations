@@ -551,9 +551,13 @@ export class Boid {
      * @param {number} height - Height of the space
      */
     edges(width, height) {
-        if (this.position.x > width) this.position.x = 0;
-        if (this.position.x < 0) this.position.x = width;
-        if (this.position.y > height) this.position.y = 0;
-        if (this.position.y < 0) this.position.y = height;
+        // Use margin so koi completely leaves screen before wrapping
+        // Margin accounts for koi visual size (body + tail can be ~60 pixels at max size)
+        const margin = 60;
+
+        if (this.position.x > width + margin) this.position.x = -margin;
+        if (this.position.x < -margin) this.position.x = width + margin;
+        if (this.position.y > height + margin) this.position.y = -margin;
+        if (this.position.y < -margin) this.position.y = height + margin;
     }
 }
