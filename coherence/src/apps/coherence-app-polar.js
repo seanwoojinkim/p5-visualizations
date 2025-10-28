@@ -10,6 +10,7 @@ import { ControlPanel } from '../ui/control-panel.js';
 import { SequencePlayer } from '../core/biometric-simulator.js';
 import { PolarH10Client } from '../integrations/polar-h10-client.js';
 import { SessionRecorder } from '../session/session-recorder.js';
+import { SessionHistory } from '../ui/session-history.js';
 
 // Global state
 let params;
@@ -19,6 +20,7 @@ let controlPanel;
 let sequencePlayer;
 let polarClient;
 let sessionRecorder;
+let sessionHistory;
 
 // Polar H10 state
 let polarMode = false;  // Toggle between Polar H10 and simulation/manual modes
@@ -86,6 +88,14 @@ window.setup = function() {
     }).catch((error) => {
         console.error('[Setup] Failed to initialize session recorder:', error);
     });
+
+    // Initialize session history panel
+    sessionHistory = new SessionHistory(
+        sessionRecorder.db,
+        () => {
+            console.log('[Setup] Session history refreshed');
+        }
+    );
 
     // Initialize Polar H10 client
     // The browser runs on the Mac, so always use localhost
@@ -193,6 +203,11 @@ window.setup = function() {
         },
         onSessionToggle: () => {
             toggleSessionRecording();
+        },
+        onViewHistory: () => {
+            if (sessionHistory) {
+                sessionHistory.toggle();
+            }
         },
     }, {
         startMinimized: true  // Start with control panel minimized
@@ -662,6 +677,11 @@ async function toggleSessionRecording() {
             if (controlPanel && controlPanel.updateSessionButton) {
                 controlPanel.updateSessionButton(false);
             }
+
+            // Refresh session history if visible
+            if (sessionHistory && sessionHistory.isVisible) {
+                await sessionHistory.refresh();
+            }
         } catch (error) {
             console.error('[Session] Failed to stop recording:', error);
             alert('Failed to stop recording: ' + error.message);
@@ -754,6 +774,7 @@ function printInstructions() {
     console.log('Keyboard Controls:');
     console.log('  P = Toggle Polar H10 mode (real HRV data)');
     console.log('  X = Start/Stop session recording (Polar H10 mode only)');
+    console.log('  H = Toggle session history panel');
     console.log('  S = Toggle simulation mode');
     console.log('  B = Toggle breathing guide (coherent breathing)');
     console.log('  ↑ ↓ = Adjust breathing rate (find your resonance frequency)');
@@ -813,6 +834,14 @@ window.keyPressed = function() {
     // X = toggle session recording
     if (key === 'x' || key === 'X') {
         toggleSessionRecording();
+        return;
+    }
+
+    // H = toggle session history
+    if (key === 'h' || key === 'H') {
+        if (sessionHistory) {
+            sessionHistory.toggle();
+        }
         return;
     }
 

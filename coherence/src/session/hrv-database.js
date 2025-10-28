@@ -315,6 +315,36 @@ export class HRVDatabase {
     }
 
     /**
+     * Get recent sessions with pagination
+     * @param {number} limit - Maximum number of sessions to return
+     * @param {number} offset - Number of sessions to skip (for pagination)
+     * @returns {Promise<Object[]>} Array of sessions
+     */
+    async getRecentSessions(limit = 50, offset = 0) {
+        const allSessions = await this.getAllSessions();
+        return allSessions.slice(offset, offset + limit);
+    }
+
+    /**
+     * Get a session with all its samples
+     * @param {string} sessionId - Session ID
+     * @returns {Promise<Object>} Object with session and samples: {session, samples}
+     */
+    async getSessionWithSamples(sessionId) {
+        const session = await this.getSession(sessionId);
+        if (!session) {
+            throw new Error(`Session ${sessionId} not found`);
+        }
+
+        const samples = await this.getSamples(sessionId);
+
+        return {
+            session,
+            samples
+        };
+    }
+
+    /**
      * Delete a session and all its samples
      * @param {string} sessionId - Session ID
      * @returns {Promise<void>}
@@ -343,6 +373,32 @@ export class HRVDatabase {
 
             transaction.onerror = () => {
                 console.error('[HRVDatabase] Failed to delete session:', transaction.error);
+                reject(transaction.error);
+            };
+        });
+    }
+
+    /**
+     * Delete all sessions and samples
+     * @returns {Promise<void>}
+     */
+    async deleteAllSessions() {
+        return new Promise((resolve, reject) => {
+            const transaction = this.db.transaction(['sessions', 'coherence_samples'], 'readwrite');
+            const sessionsStore = transaction.objectStore('sessions');
+            const samplesStore = transaction.objectStore('coherence_samples');
+
+            // Clear both stores
+            const clearSessions = sessionsStore.clear();
+            const clearSamples = samplesStore.clear();
+
+            transaction.oncomplete = () => {
+                console.log('[HRVDatabase] Deleted all sessions and samples');
+                resolve();
+            };
+
+            transaction.onerror = () => {
+                console.error('[HRVDatabase] Failed to delete all sessions:', transaction.error);
                 reject(transaction.error);
             };
         });

@@ -210,6 +210,24 @@ export class ControlPanel {
         sessionBtn.parent(this.content);
         this.controls.sessionBtn = sessionBtn;
 
+        // View History button
+        const historyBtn = createButton('View History');
+        historyBtn.style('margin-top', '10px');
+        historyBtn.style('padding', '8px 20px');
+        historyBtn.style('background', '#8b5cf6');
+        historyBtn.style('color', 'white');
+        historyBtn.style('border', 'none');
+        historyBtn.style('border-radius', '8px');
+        historyBtn.style('cursor', 'pointer');
+        historyBtn.style('font-size', '14px');
+        historyBtn.style('width', '100%');
+        historyBtn.mousePressed(() => {
+            if (this.callbacks.onViewHistory) {
+                this.callbacks.onViewHistory();
+            }
+        });
+        historyBtn.parent(this.content);
+
         // Reset button
         const resetBtn = createButton('Reset');
         resetBtn.style('margin-top', '10px');
