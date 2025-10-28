@@ -1,0 +1,11 @@
+# This is an Asset Catalog Definition file for Blender.
+#
+# Empty lines and lines starting with `#` will be ignored.
+# The first non-ignored line should be the version indicator.
+# Other lines are of the format "UUID:catalog/path/for/assets:simple catalog name"
+
+VERSION 1
+
+3a3db683-1f52-4a0c-9f58-d728c854d901:Stylized Cloud Generator:Stylized Cloud Generator
+ec012eea-b9fb-4b12-a19a-9e3f577600f6:Stylized Cloud Generator/Geometry Nodes Set Up:Stylized Cloud Generator-Geometry Nodes Set Up
+d64e9ff2-b991-4d4f-a27c-d4cc2a3edfbf:Stylized Cloud Generator/Materials:Stylized Cloud Generator-Materials

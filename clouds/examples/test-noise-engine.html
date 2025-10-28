@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cloud Noise Engine Test - Multi-Scale Noise Visualization</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.7.0/p5.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: 'Monaco', 'Courier New', monospace;
+            background: #1a1a2e;
+            color: #eee;
+        }
+
+        h1 {
+            margin: 0 0 10px 0;
+            font-size: 24px;
+            font-weight: normal;
+        }
+
+        .controls {
+            background: #16213e;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            align-items: center;
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .control-group label {
+            font-size: 12px;
+            color: #aaa;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .control-group input,
+        .control-group select,
+        .control-group button {
+            padding: 8px 12px;
+            background: #0f3460;
+            border: 1px solid #16558f;
+            color: #eee;
+            border-radius: 4px;
+            font-family: inherit;
+            font-size: 14px;
+        }
+
+        .control-group button {
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .control-group button:hover {
+            background: #16558f;
+        }
+
+        .info {
+            background: #16213e;
+            padding: 10px 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            font-size: 12px;
+            line-height: 1.6;
+        }
+
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .info-item {
+            background: #0f3460;
+            padding: 8px;
+            border-radius: 4px;
+        }
+
+        .info-item strong {
+            color: #4ecca3;
+        }
+
+        canvas {
+            border: 2px solid #16558f;
+            border-radius: 8px;
+            display: block;
+        }
+
+        .visualization-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+
+        .viz-section {
+            background: #16213e;
+            padding: 15px;
+            border-radius: 8px;
+        }
+
+        .viz-section h3 {
+            margin: 0 0 10px 0;
+            font-size: 14px;
+            font-weight: normal;
+            color: #4ecca3;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        #particles-canvas {
+            margin-top: 15px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Cloud Noise Engine Test</h1>
+    <div class="info">
+        <strong>Phase 1: Core Noise Engine and Calming Movement System</strong><br>
+        This test visualizes the multi-scale noise system with exact Blender scales (512, 12.25, 0.12).<br>
+        Watch how particles drift slowly and smoothly, creating calming ambient movement.
+    </div>
+
+    <div class="controls">
+        <div class="control-group">
+            <label>Seed</label>
+            <input type="number" id="seed-input" value="42" min="0" max="10000">
+        </div>
+        <div class="control-group">
+            <label>Time Speed</label>
+            <input type="range" id="time-speed" min="0.1" max="5" step="0.1" value="1">
+            <span id="time-speed-value">1.0x</span>
+        </div>
+        <div class="control-group">
+            <label>Max Speed (px/frame)</label>
+            <input type="range" id="max-speed" min="0.05" max="1" step="0.05" value="0.3">
+            <span id="max-speed-value">0.30</span>
+        </div>
+        <div class="control-group">
+            <label>Display Mode</label>
+            <select id="display-mode">
+                <option value="combined">Combined (All Scales)</option>
+                <option value="large">Large Scale Only (512)</option>
+                <option value="medium">Medium Scale Only (12.25)</option>
+                <option value="fine">Fine Scale Only (0.12)</option>
+                <option value="particles">Drifting Particles</option>
+            </select>
+        </div>
+        <div class="control-group">
+            <button id="reset-btn">Reset Time</button>
+        </div>
+        <div class="control-group">
+            <button id="new-seed-btn">Random Seed</button>
+        </div>
+    </div>
+
+    <div class="info-grid">
+        <div class="info-item">
+            <strong>Time:</strong> <span id="time-display">0.0s</span>
+        </div>
+        <div class="info-item">
+            <strong>Frame Rate:</strong> <span id="fps-display">60 fps</span>
+        </div>
+        <div class="info-item">
+            <strong>Noise Config:</strong> <span id="config-display">Large: 512, Medium: 12.25, Fine: 0.12</span>
+        </div>
+        <div class="info-item">
+            <strong>Avg Velocity:</strong> <span id="velocity-display">0.0 px/frame</span>
+        </div>
+    </div>
+
+    <div id="sketch-container"></div>
+
+    <script type="module">
+        // Import noise engine (inline for simplicity in test)
+        class CloudNoiseEngine {
+            constructor(params = {}) {
+                this.scales = {
+                    large: params.scaleNoise?.large || 512.0,
+                    medium: params.scaleNoise?.medium || 12.25,
+                    fine: params.scaleNoise?.fine || 0.12
+                };
+
+                this.weights = {
+                    large: params.weights?.large || 1.0,
+                    medium: params.weights?.medium || 0.3,
+                    fine: params.weights?.fine || 0.1
+                };
+
+                this.timeMultipliers = {
+                    large: 0.0001,
+                    medium: 0.0002,
+                    fine: 0.0003
+                };
+
+                this.seed = params.seed || 0;
+                this.totalWeight = this.weights.large + this.weights.medium + this.weights.fine;
+                this.timeOffset = 0;
+            }
+
+            sample2D(x, y, time = 0) {
+                const nL = noise(
+                    (x + this.seed) / this.scales.large,
+                    y / this.scales.large,
+                    time * this.timeMultipliers.large
+                );
+
+                const nM = noise(
+                    (x + this.seed + 1000) / this.scales.medium,
+                    (y + 500) / this.scales.medium,
+                    time * this.timeMultipliers.medium
+                );
+
+                const nF = noise(
+                    (x + this.seed + 2000) / this.scales.fine,
+                    (y + 1500) / this.scales.fine,
+                    time * this.timeMultipliers.fine
+                );
+
+                const combined = (
+                    nL * this.weights.large +
+                    nM * this.weights.medium +
+                    nF * this.weights.fine
+                );
+
+                return combined / this.totalWeight;
+            }
+
+            sampleSingleScale(x, y, time, scale, timeMult) {
+                return noise(
+                    (x + this.seed) / scale,
+                    y / scale,
+                    time * timeMult
+                );
+            }
+
+            getDriftVelocity(sprite, time) {
+                const nx = this.sample2D(sprite.seedX, sprite.seedY, time);
+                const ny = this.sample2D(
+                    sprite.seedX + 10000,
+                    sprite.seedY + 10000,
+                    time
+                );
+
+                return {
+                    x: (nx - 0.5) * sprite.maxSpeed,
+                    y: (ny - 0.5) * sprite.maxSpeed
+                };
+            }
+
+            update(deltaTime) {
+                this.timeOffset += deltaTime;
+            }
+
+            getTime() {
+                return this.timeOffset;
+            }
+
+            resetTime() {
+                this.timeOffset = 0;
+            }
+
+            setSeed(newSeed) {
+                this.seed = newSeed;
+            }
+        }
+
+        // P5.js sketch
+        let noiseEngine;
+        let particles = [];
+        let displayMode = 'combined';
+        let timeSpeedMultiplier = 1.0;
+        let maxParticleSpeed = 0.3;
+        let velocitySamples = [];
+        const CANVAS_WIDTH = 800;
+        const CANVAS_HEIGHT = 600;
+        const PARTICLE_COUNT = 100;
+
+        // Create particles
+        function createParticles() {
+            particles = [];
+            for (let i = 0; i < PARTICLE_COUNT; i++) {
+                particles.push({
+                    x: random(CANVAS_WIDTH),
+                    y: random(CANVAS_HEIGHT),
+                    seedX: random(10000),
+                    seedY: random(10000),
+                    maxSpeed: maxParticleSpeed,
+                    size: random(10, 30),
+                    alpha: random(100, 200)
+                });
+            }
+        }
+
+        window.setup = function() {
+            const canvas = createCanvas(CANVAS_WIDTH, CANVAS_HEIGHT);
+            canvas.parent('sketch-container');
+
+            noiseEngine = new CloudNoiseEngine({ seed: 42 });
+            createParticles();
+
+            frameRate(60);
+        };
+
+        window.draw = function() {
+            background(20, 30, 40);
+
+            // Update noise engine time
+            const deltaTime = deltaTime || 16.67;
+            noiseEngine.update(deltaTime * timeSpeedMultiplier);
+            const currentTime = noiseEngine.getTime();
+
+            // Render based on display mode
+            if (displayMode === 'particles') {
+                drawParticles(currentTime);
+            } else {
+                drawNoiseField(currentTime);
+            }
+
+            // Update UI
+            updateUI(currentTime);
+        };
+
+        function drawNoiseField(currentTime) {
+            const resolution = 5;
+            loadPixels();
+
+            for (let x = 0; x < CANVAS_WIDTH; x += resolution) {
+                for (let y = 0; y < CANVAS_HEIGHT; y += resolution) {
+                    let noiseVal;
+
+                    switch(displayMode) {
+                        case 'large':
+                            noiseVal = noiseEngine.sampleSingleScale(x, y, currentTime, 512, 0.0001);
+                            break;
+                        case 'medium':
+                            noiseVal = noiseEngine.sampleSingleScale(x, y, currentTime, 12.25, 0.0002);
+                            break;
+                        case 'fine':
+                            noiseVal = noiseEngine.sampleSingleScale(x, y, currentTime, 0.12, 0.0003);
+                            break;
+                        default: // combined
+                            noiseVal = noiseEngine.sample2D(x, y, currentTime);
+                    }
+
+                    const brightness = noiseVal * 255;
+
+                    // Fill resolution block
+                    for (let dx = 0; dx < resolution; dx++) {
+                        for (let dy = 0; dy < resolution; dy++) {
+                            const px = x + dx;
+                            const py = y + dy;
+                            if (px < CANVAS_WIDTH && py < CANVAS_HEIGHT) {
+                                const index = (px + py * CANVAS_WIDTH) * 4;
+                                pixels[index] = brightness;
+                                pixels[index + 1] = brightness;
+                                pixels[index + 2] = brightness * 1.1;
+                                pixels[index + 3] = 255;
+                            }
+                        }
+                    }
+                }
+            }
+
+            updatePixels();
+        }
+
+        function drawParticles(currentTime) {
+            velocitySamples = [];
+
+            for (let particle of particles) {
+                // Get drift velocity
+                const velocity = noiseEngine.getDriftVelocity(particle, currentTime);
+
+                // Update position
+                particle.x += velocity.x;
+                particle.y += velocity.y;
+
+                // Wrap around edges
+                if (particle.x < 0) particle.x += CANVAS_WIDTH;
+                if (particle.x > CANVAS_WIDTH) particle.x -= CANVAS_WIDTH;
+                if (particle.y < 0) particle.y += CANVAS_HEIGHT;
+                if (particle.y > CANVAS_HEIGHT) particle.y -= CANVAS_HEIGHT;
+
+                // Track velocity for stats
+                const speed = Math.sqrt(velocity.x * velocity.x + velocity.y * velocity.y);
+                velocitySamples.push(speed);
+
+                // Draw particle (soft gradient)
+                for (let r = particle.size; r > 0; r -= particle.size / 6) {
+                    const alpha = map(r, 0, particle.size, 0, particle.alpha);
+                    fill(200, 220, 255, alpha);
+                    noStroke();
+                    circle(particle.x, particle.y, r * 2);
+                }
+            }
+        }
+
+        function updateUI(currentTime) {
+            document.getElementById('time-display').textContent = (currentTime / 1000).toFixed(1) + 's';
+            document.getElementById('fps-display').textContent = Math.round(frameRate()) + ' fps';
+
+            if (velocitySamples.length > 0) {
+                const avgVelocity = velocitySamples.reduce((a, b) => a + b, 0) / velocitySamples.length;
+                document.getElementById('velocity-display').textContent = avgVelocity.toFixed(3) + ' px/frame';
+            }
+        }
+
+        // UI Controls
+        document.getElementById('seed-input').addEventListener('change', (e) => {
+            noiseEngine.setSeed(parseInt(e.target.value));
+            noiseEngine.resetTime();
+        });
+
+        document.getElementById('time-speed').addEventListener('input', (e) => {
+            timeSpeedMultiplier = parseFloat(e.target.value);
+            document.getElementById('time-speed-value').textContent = timeSpeedMultiplier.toFixed(1) + 'x';
+        });
+
+        document.getElementById('max-speed').addEventListener('input', (e) => {
+            maxParticleSpeed = parseFloat(e.target.value);
+            document.getElementById('max-speed-value').textContent = maxParticleSpeed.toFixed(2);
+            particles.forEach(p => p.maxSpeed = maxParticleSpeed);
+        });
+
+        document.getElementById('display-mode').addEventListener('change', (e) => {
+            displayMode = e.target.value;
+        });
+
+        document.getElementById('reset-btn').addEventListener('click', () => {
+            noiseEngine.resetTime();
+        });
+
+        document.getElementById('new-seed-btn').addEventListener('click', () => {
+            const newSeed = Math.floor(Math.random() * 10000);
+            document.getElementById('seed-input').value = newSeed;
+            noiseEngine.setSeed(newSeed);
+            noiseEngine.resetTime();
+            createParticles();
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,982 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calming Clouds - HRV Biofeedback Visualization</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.7.0/p5.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background: #1a1a2e;
+            font-family: 'Monaco', 'Courier New', monospace;
+        }
+
+        canvas {
+            display: block;
+        }
+
+        #controls {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(22, 33, 62, 0.95);
+            padding: 20px;
+            border-radius: 8px;
+            color: #eee;
+            font-size: 12px;
+            min-width: 200px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(22, 85, 143, 0.3);
+        }
+
+        #controls.minimized {
+            min-width: 60px;
+            padding: 10px;
+        }
+
+        #controls.minimized h3,
+        #controls.minimized .control-group,
+        #controls.minimized .info-text {
+            display: none;
+        }
+
+        h3 {
+            margin: 0 0 15px 0;
+            font-size: 14px;
+            font-weight: normal;
+            color: #4ecca3;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .control-group {
+            margin-bottom: 15px;
+        }
+
+        .control-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 11px;
+            color: #aaa;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .control-group input[type="range"] {
+            width: 100%;
+            margin-bottom: 3px;
+        }
+
+        .control-group .value-display {
+            color: #4ecca3;
+            font-size: 11px;
+        }
+
+        .control-group button {
+            width: 100%;
+            padding: 8px;
+            background: #0f3460;
+            border: 1px solid #16558f;
+            color: #eee;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background 0.2s;
+            font-family: inherit;
+            font-size: 12px;
+        }
+
+        .control-group button:hover {
+            background: #16558f;
+        }
+
+        #toggle-controls {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            width: 24px;
+            height: 24px;
+            padding: 0;
+            background: transparent;
+            border: none;
+            color: #4ecca3;
+            cursor: pointer;
+            font-size: 16px;
+        }
+
+        .info-text {
+            font-size: 11px;
+            color: #888;
+            line-height: 1.4;
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid rgba(22, 85, 143, 0.3);
+        }
+
+        .info-text strong {
+            color: #4ecca3;
+        }
+
+        #info-overlay {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(22, 33, 62, 0.95);
+            padding: 12px 16px;
+            border-radius: 8px;
+            color: #eee;
+            font-size: 11px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(22, 85, 143, 0.3);
+        }
+
+        .info-item {
+            margin: 3px 0;
+        }
+
+        .info-item strong {
+            color: #4ecca3;
+            margin-right: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div id="controls">
+        <button id="toggle-controls">×</button>
+        <h3>Calming Clouds</h3>
+
+        <div class="control-group">
+            <label>Particle Count</label>
+            <input type="range" id="particle-count" min="30" max="200" step="10" value="100">
+            <div class="value-display"><span id="particle-count-value">100</span> particles</div>
+        </div>
+
+        <div class="control-group">
+            <label>Drift Speed</label>
+            <input type="range" id="max-speed" min="0.05" max="0.5" step="0.05" value="0.3">
+            <div class="value-display"><span id="max-speed-value">0.30</span> px/frame</div>
+        </div>
+
+        <div class="control-group">
+            <label>Opacity</label>
+            <input type="range" id="opacity" min="0.4" max="1.0" step="0.05" value="0.85">
+            <div class="value-display"><span id="opacity-value">0.85</span></div>
+        </div>
+
+        <div class="control-group">
+            <label>Blend Mode</label>
+            <select id="blend-mode">
+                <option value="BLEND">BLEND (normal)</option>
+                <option value="ADD">ADD (glow)</option>
+                <option value="MULTIPLY">MULTIPLY (darken)</option>
+                <option value="SCREEN">SCREEN (lighten)</option>
+                <option value="LIGHTEN">LIGHTEN (only lighter)</option>
+                <option value="DARKEST">DARKEST (only darker)</option>
+            </select>
+        </div>
+
+        <div class="control-group">
+            <button id="reset-btn">Reset Time</button>
+        </div>
+
+        <div class="control-group">
+            <button id="new-seed-btn">New Pattern</button>
+        </div>
+
+        <div class="info-text">
+            <strong>Phase 2:</strong> Soft layered cloud visualization with multi-scale noise engine for calming ambient drift. Now using CloudBackground component with depth layers and smooth gradients.
+        </div>
+    </div>
+
+    <div id="info-overlay">
+        <div class="info-item"><strong>FPS:</strong> <span id="fps-display">60</span></div>
+        <div class="info-item"><strong>Sprites:</strong> <span id="sprite-count">0</span></div>
+        <div class="info-item"><strong>Press C</strong> to toggle controls</div>
+    </div>
+
+    <script type="module">
+        // Inline CloudNoiseEngine for standalone demo
+        class CloudNoiseEngine {
+            constructor(params = {}) {
+                this.scales = {
+                    large: params.scaleNoise?.large || 512.0,
+                    medium: params.scaleNoise?.medium || 12.25,
+                    fine: params.scaleNoise?.fine || 0.12
+                };
+
+                this.weights = {
+                    large: params.weights?.large || 1.0,
+                    medium: params.weights?.medium || 0.3,
+                    fine: params.weights?.fine || 0.1
+                };
+
+                this.timeMultipliers = {
+                    large: 0.0001,
+                    medium: 0.0002,
+                    fine: 0.0003
+                };
+
+                this.seed = params.seed || 0;
+                this.totalWeight = this.weights.large + this.weights.medium + this.weights.fine;
+                this.timeOffset = 0;
+            }
+
+            sample2D(x, y, time = 0) {
+                const nL = noise(
+                    (x + this.seed) / this.scales.large,
+                    y / this.scales.large,
+                    time * this.timeMultipliers.large
+                );
+
+                const nM = noise(
+                    (x + this.seed + 1000) / this.scales.medium,
+                    (y + 500) / this.scales.medium,
+                    time * this.timeMultipliers.medium
+                );
+
+                const nF = noise(
+                    (x + this.seed + 2000) / this.scales.fine,
+                    (y + 1500) / this.scales.fine,
+                    time * this.timeMultipliers.fine
+                );
+
+                const combined = (
+                    nL * this.weights.large +
+                    nM * this.weights.medium +
+                    nF * this.weights.fine
+                );
+
+                return combined / this.totalWeight;
+            }
+
+            getDriftVelocity(sprite, time) {
+                const nx = this.sample2D(sprite.seedX, sprite.seedY, time);
+                const ny = this.sample2D(
+                    sprite.seedX + 10000,
+                    sprite.seedY + 10000,
+                    time
+                );
+
+                return {
+                    x: (nx - 0.5) * sprite.maxSpeed,
+                    y: (ny - 0.5) * sprite.maxSpeed
+                };
+            }
+
+            update(deltaTime) {
+                this.timeOffset += deltaTime;
+            }
+
+            getTime() {
+                return this.timeOffset;
+            }
+
+            resetTime() {
+                this.timeOffset = 0;
+            }
+
+            setSeed(newSeed) {
+                this.seed = newSeed;
+            }
+
+            getConfig() {
+                return {
+                    scales: { ...this.scales },
+                    weights: { ...this.weights },
+                    timeMultipliers: { ...this.timeMultipliers },
+                    seed: this.seed,
+                    totalWeight: this.totalWeight
+                };
+            }
+        }
+
+        // CloudShapePresets - Predefined cloud silhouettes
+        class CloudShapePresets {
+            static getRandomPreset() {
+                const presets = [
+                    this.CUMULUS_PUFFY,
+                    this.CUMULUS_FLAT,
+                    this.CUMULUS_TALL,
+                    this.WISPY_ELONGATED,
+                    this.ROUNDED_CLUSTER
+                ];
+                return random(presets);
+            }
+
+            // Classic puffy cumulus with rounded top
+            static CUMULUS_PUFFY = [
+                { x: 0.0, y: 0.3, r: 0.4 },    // Base center
+                { x: -0.4, y: 0.2, r: 0.35 },  // Left bulge
+                { x: 0.4, y: 0.2, r: 0.35 },   // Right bulge
+                { x: -0.2, y: -0.2, r: 0.4 },  // Top-left puff
+                { x: 0.2, y: -0.2, r: 0.4 },   // Top-right puff
+                { x: 0.0, y: -0.3, r: 0.35 }   // Top center
+            ];
+
+            // Flatter cumulus (wider than tall)
+            static CUMULUS_FLAT = [
+                { x: 0.0, y: 0.2, r: 0.45 },   // Base
+                { x: -0.5, y: 0.1, r: 0.35 },  // Left
+                { x: 0.5, y: 0.1, r: 0.35 },   // Right
+                { x: -0.25, y: -0.15, r: 0.3 }, // Top-left
+                { x: 0.25, y: -0.15, r: 0.3 }  // Top-right
+            ];
+
+            // Tall towering cumulus
+            static CUMULUS_TALL = [
+                { x: 0.0, y: 0.4, r: 0.35 },   // Base
+                { x: -0.2, y: 0.1, r: 0.4 },   // Mid-left
+                { x: 0.2, y: 0.1, r: 0.4 },    // Mid-right
+                { x: 0.0, y: -0.2, r: 0.35 },  // Upper
+                { x: 0.0, y: -0.5, r: 0.25 }   // Top puff
+            ];
+
+            // Wispy elongated
+            static WISPY_ELONGATED = [
+                { x: -0.4, y: 0.0, r: 0.3 },   // Left
+                { x: -0.15, y: 0.1, r: 0.35 }, // Mid-left
+                { x: 0.15, y: -0.1, r: 0.35 }, // Mid-right
+                { x: 0.4, y: 0.0, r: 0.3 }     // Right
+            ];
+
+            // Rounded cluster
+            static ROUNDED_CLUSTER = [
+                { x: 0.0, y: 0.0, r: 0.5 },    // Center large
+                { x: -0.35, y: -0.25, r: 0.3 }, // Top-left
+                { x: 0.35, y: -0.25, r: 0.3 },  // Top-right
+                { x: -0.3, y: 0.3, r: 0.25 },   // Bottom-left
+                { x: 0.3, y: 0.3, r: 0.25 }     // Bottom-right
+            ];
+        }
+
+        // CloudShape - Base cloud region using preset silhouettes
+        class CloudShape {
+            constructor(x, y, params = {}) {
+                this.center = { x, y };
+                this.baseWidth = params.width || 300;
+                this.baseHeight = params.height || 200;
+                this.rotation = params.rotation || 0;
+                this.seed = params.seed || Math.floor(Math.random() * 10000);
+
+                // Use preset shape or default to simple ellipse
+                this.preset = params.preset || CloudShapePresets.getRandomPreset();
+            }
+
+            sampleGridPoints(gridResolution, noiseEngine) {
+                const points = [];
+                const minX = this.center.x - this.baseWidth * 0.8;
+                const maxX = this.center.x + this.baseWidth * 0.8;
+                const minY = this.center.y - this.baseHeight * 0.8;
+                const maxY = this.center.y + this.baseHeight * 0.8;
+
+                for (let x = minX; x <= maxX; x += gridResolution) {
+                    for (let y = minY; y <= maxY; y += gridResolution) {
+                        // Check if point is inside any of the preset circles
+                        let maxDensity = 0;
+                        let closestDist = Infinity;
+
+                        for (const circle of this.preset) {
+                            // Transform circle position by cloud's base size and rotation
+                            const cos = Math.cos(this.rotation);
+                            const sin = Math.sin(this.rotation);
+                            const circleX = this.center.x + circle.x * this.baseWidth;
+                            const circleY = this.center.y + circle.y * this.baseHeight;
+                            const circleRadius = circle.r * Math.max(this.baseWidth, this.baseHeight);
+
+                            // Distance from point to this circle's center
+                            const dx = x - circleX;
+                            const dy = y - circleY;
+                            const dist = Math.sqrt(dx * dx + dy * dy);
+
+                            // Add boundary noise for organic edges
+                            const boundaryNoise = noiseEngine.sample2D(x * 0.02 + this.seed, y * 0.02 + this.seed, 0);
+                            const distortedRadius = circleRadius * (1.0 + (boundaryNoise - 0.5) * 0.4);
+
+                            if (dist < distortedRadius) {
+                                const normalizedDist = dist / distortedRadius;
+                                const circleDensity = 1.0 - Math.pow(normalizedDist, 0.6);
+                                maxDensity = Math.max(maxDensity, circleDensity);
+                                closestDist = Math.min(closestDist, normalizedDist);
+                            }
+                        }
+
+                        if (maxDensity > 0) {
+                            // Apply noise-based density variation
+                            const densityNoise = noiseEngine.sample2D(x + this.seed, y + this.seed, 0);
+                            const finalDensity = maxDensity * densityNoise;
+
+                            points.push({
+                                x,
+                                y,
+                                density: finalDensity,
+                                distFromCenter: closestDist
+                            });
+                        }
+                    }
+                }
+                return points;
+            }
+        }
+
+        // Make CloudShape and presets available globally
+        window.CloudShape = CloudShape;
+        window.CloudShapePresets = CloudShapePresets;
+
+        // CloudSprite - Phase 2
+        class CloudSprite {
+            constructor(x, y, layer, params) {
+                this.pos = { x, y };
+                this.seedX = x;
+                this.seedY = y;
+                this.layer = layer;
+                this.depth = layer ? layer.depth : 0.5;
+
+                const sizeVariation = 0.7 + Math.random() * 0.6;
+                this.baseScale = params.baseScale * sizeVariation;
+                this.scale = this.baseScale;
+                this.baseOpacity = params.baseOpacity || 0.8;
+                this.opacity = this.baseOpacity;
+
+                // Color variance for natural depth and lighting
+                this.baseColor = this.generateColorVariant(
+                    params.baseColor || { r: 240, g: 245, b: 250 },
+                    this.depth,
+                    params.densityValue || 0.5
+                );
+                this.color = { ...this.baseColor };
+
+                this.maxSpeed = params.movementSpeed || 0.3;
+                this.glowRadius = 1.0;
+
+                // Randomly select brushstroke texture for painterly quality
+                if (brushstrokeTextures && brushstrokeTextures.length > 0) {
+                    this.texture = random(brushstrokeTextures);
+                } else {
+                    this.texture = null;
+                }
+
+                // Random rotation for variety
+                this.rotation = random(TWO_PI);
+            }
+
+            update(noiseEngine, time, biofeedbackParams, canvasWidth, canvasHeight) {
+                const drift = noiseEngine.getDriftVelocity(this, time);
+                const speedMod = biofeedbackParams?.movementSpeed || 1.0;
+                this.pos.x += drift.x * speedMod;
+                this.pos.y += drift.y * speedMod;
+
+                const buffer = this.scale * 2;
+                if (this.pos.x < -buffer) this.pos.x += canvasWidth + buffer * 2;
+                if (this.pos.x > canvasWidth + buffer) this.pos.x -= canvasWidth + buffer * 2;
+                if (this.pos.y < -buffer) this.pos.y += canvasHeight + buffer * 2;
+                if (this.pos.y > canvasHeight + buffer) this.pos.y -= canvasHeight + buffer * 2;
+
+                if (biofeedbackParams) {
+                    this.opacity = this.baseOpacity * (biofeedbackParams.opacity || 1.0);
+                    this.glowRadius = biofeedbackParams.glowRadius || 1.0;
+                    if (biofeedbackParams.colorTemp) {
+                        this.color = this.lerpColorToward(
+                            this.baseColor,
+                            biofeedbackParams.colorTemp,
+                            0.3
+                        );
+                    }
+                }
+            }
+
+            display(p5) {
+                if (this.opacity <= 0) return;
+
+                if (this.texture) {
+                    this.renderWithTexture(p5);
+                } else {
+                    // Fallback to procedural gradient
+                    const radius = this.scale * this.glowRadius;
+                    this.renderWithRings(p5, radius);
+                }
+            }
+
+            renderWithTexture(p5) {
+                const size = this.scale * 2 * this.glowRadius;
+
+                // Create cache key based on texture and approximate size
+                const sizeKey = Math.round(size / 10) * 10;  // Round to nearest 10px
+                const cacheKey = `${brushstrokeTextures.indexOf(this.texture)}_${sizeKey}`;
+
+                // Get or create cached resized texture
+                if (!cachedTextures[cacheKey]) {
+                    const g = createGraphics(sizeKey, sizeKey);
+                    g.imageMode(CENTER);
+                    g.image(this.texture, sizeKey/2, sizeKey/2, sizeKey, sizeKey);
+                    cachedTextures[cacheKey] = g;
+                }
+
+                p5.push();
+                p5.translate(this.pos.x, this.pos.y);
+                p5.rotate(this.rotation);
+
+                // Apply tint for color and opacity
+                p5.tint(this.color.r, this.color.g, this.color.b, this.opacity * 255);
+
+                // Render cached texture
+                p5.imageMode(p5.CENTER);
+                p5.image(cachedTextures[cacheKey], 0, 0);
+
+                p5.pop();
+            }
+
+            renderWithRings(p5, radius) {
+                const rings = 12;
+                const centerAlpha = this.opacity * 255;
+
+                p5.push();
+                p5.noStroke();
+
+                for (let i = rings; i >= 0; i--) {
+                    const r = radius * (i / rings);
+                    const t = i / rings;
+                    const smoothT = this.smoothstep(0, 1, t);
+                    const alpha = smoothT * centerAlpha;
+
+                    p5.fill(this.color.r, this.color.g, this.color.b, alpha);
+                    p5.circle(this.pos.x, this.pos.y, r * 2);
+                }
+
+                p5.pop();
+            }
+
+            smoothstep(edge0, edge1, x) {
+                const t = Math.max(0, Math.min(1, (x - edge0) / (edge1 - edge0)));
+                return t * t * (3 - 2 * t);
+            }
+
+            generateColorVariant(baseColor, depth, density) {
+                // Create dramatic color variance for natural cloud lighting
+                // Real clouds have: dark blue-gray shadows, mid-tone whites, bright highlights
+
+                // Stronger density influence: creates visible light/shadow areas
+                const densityFactor = Math.pow(density, 0.8);  // 0-1 with more contrast
+
+                // Random variation for organic irregularity (wider range)
+                const randomVariation = 0.85 + Math.random() * 0.3;  // 0.85-1.15
+
+                // Combine for brightness
+                const brightness = densityFactor * randomVariation;
+
+                // Define color palette based on brightness
+                let resultColor;
+
+                if (brightness < 0.4) {
+                    // Deep shadows: dark blue-gray
+                    const shadowColor = { r: 130, g: 150, b: 180 };
+                    resultColor = {
+                        r: shadowColor.r + (baseColor.r - shadowColor.r) * (brightness / 0.4),
+                        g: shadowColor.g + (baseColor.g - shadowColor.g) * (brightness / 0.4),
+                        b: shadowColor.b + (baseColor.b - shadowColor.b) * (brightness / 0.4)
+                    };
+                } else if (brightness < 0.7) {
+                    // Mid-tones: soft blue-white
+                    const midColor = { r: 190, g: 210, b: 230 };
+                    const t = (brightness - 0.4) / 0.3;
+                    resultColor = {
+                        r: midColor.r + (baseColor.r - midColor.r) * t,
+                        g: midColor.g + (baseColor.g - midColor.g) * t,
+                        b: midColor.b + (baseColor.b - midColor.b) * t
+                    };
+                } else {
+                    // Highlights: bright white (with slight depth influence)
+                    const depthDarken = 1.0 - (depth * 0.1);
+                    resultColor = {
+                        r: baseColor.r * brightness * depthDarken,
+                        g: baseColor.g * brightness * depthDarken,
+                        b: baseColor.b * brightness * depthDarken
+                    };
+                }
+
+                return {
+                    r: Math.round(Math.max(0, Math.min(255, resultColor.r))),
+                    g: Math.round(Math.max(0, Math.min(255, resultColor.g))),
+                    b: Math.round(Math.max(0, Math.min(255, resultColor.b)))
+                };
+            }
+
+            lerpColorToward(current, target, t) {
+                return {
+                    r: Math.round(current.r + (target.r - current.r) * t),
+                    g: Math.round(current.g + (target.g - current.g) * t),
+                    b: Math.round(current.b + (target.b - current.b) * t)
+                };
+            }
+        }
+
+        // CloudLayer - Phase 2
+        class CloudLayer {
+            constructor(depth, params = {}) {
+                this.depth = depth;
+                this.sprites = [];
+                this.depthScale = 0.5 + (depth * 0.5);
+                this.depthAlpha = 0.4 + (depth * 0.6);
+                this.parallaxFactor = depth * 0.3;
+                this.params = params;
+                this.separationModulation = 1.0;
+            }
+
+            addSprite(sprite) {
+                sprite.layer = this;
+                sprite.depth = this.depth;
+                sprite.baseScale *= this.depthScale;
+                sprite.scale = sprite.baseScale;
+                sprite.baseOpacity *= this.depthAlpha;
+                sprite.opacity = sprite.baseOpacity;
+                this.sprites.push(sprite);
+            }
+
+            generateSprites(noiseEngine, canvasWidth, canvasHeight) {
+                const gridResolution = this.params.gridResolution || 40;  // Much larger spacing (was 25)
+                const scaleVar = this.params.scaleVar || 0.3;
+                const offsetRandom = this.params.offsetRandom || 10;
+                const numClouds = this.params.numClouds || 3;
+
+                // Generate discrete cloud shapes
+                this.cloudShapes = this.generateCloudShapes(numClouds, canvasWidth, canvasHeight);
+
+                // Distribute particles within each cloud shape
+                for (let shapeIdx = 0; shapeIdx < this.cloudShapes.length; shapeIdx++) {
+                    const shape = this.cloudShapes[shapeIdx];
+                    const points = shape.sampleGridPoints(gridResolution, noiseEngine);
+
+                    let passedThreshold = 0;
+                    for (const point of points) {
+                        if (point.density > 0.25) {  // Increased to 0.25 to reduce particle count (was 0.12)
+                            passedThreshold++;
+                            const offsetX = (Math.random() - 0.5) * offsetRandom * 2;
+                            const offsetY = (Math.random() - 0.5) * offsetRandom * 2;
+
+                            // More uniform size: less density influence, tighter random range
+                            const densityScale = 0.85 + point.density * 0.3;  // Range: 0.85-1.15
+                            const randomScale = 1.0 + (Math.random() - 0.5) * 0.4;  // Range: 0.8-1.2
+                            const finalScale = (this.params.baseScale || 40) * densityScale * randomScale;
+
+                            const sprite = new CloudSprite(point.x + offsetX, point.y + offsetY, this, {
+                                baseScale: finalScale,
+                                baseOpacity: this.params.baseOpacity || 0.8,
+                                baseColor: this.params.baseColor || { r: 240, g: 245, b: 250 },
+                                movementSpeed: this.params.movementSpeed || 0.3,
+                                densityValue: point.density  // For color variance
+                            });
+                            this.addSprite(sprite);
+                        }
+                    }
+                }
+            }
+
+            generateCloudShapes(count, canvasWidth, canvasHeight) {
+                const shapes = [];
+                const padding = 100;
+
+                for (let i = 0; i < count; i++) {
+                    const x = padding + Math.random() * (canvasWidth - padding * 2);
+                    const y = padding + Math.random() * (canvasHeight - padding * 2);
+
+                    // Use varied preset shapes with size variation
+                    const baseSize = 250 + Math.random() * 200;  // 250-450px
+                    const aspectRatio = 0.7 + Math.random() * 0.6;  // 0.7-1.3
+                    const width = baseSize;
+                    const height = baseSize * aspectRatio;
+                    const rotation = Math.random() * Math.PI * 2;
+
+                    // Random preset for each cloud
+                    const preset = CloudShapePresets.getRandomPreset();
+
+                    shapes.push(new CloudShape(x, y, {
+                        width,
+                        height,
+                        rotation,
+                        preset,
+                        seed: Math.floor(Math.random() * 10000) + this.depth * 1000
+                    }));
+                }
+
+                return shapes;
+            }
+
+            update(noiseEngine, time, biofeedbackParams, canvasWidth, canvasHeight) {
+                if (biofeedbackParams && biofeedbackParams.layerSeparation !== undefined) {
+                    this.separationModulation = biofeedbackParams.layerSeparation;
+                }
+                for (const sprite of this.sprites) {
+                    sprite.update(noiseEngine, time, biofeedbackParams, canvasWidth, canvasHeight);
+                }
+            }
+
+            display(p5, cameraOffset = { x: 0, y: 0 }) {
+                p5.push();
+
+                // Apply selected blend mode (controlled by UI)
+                const mode = window.currentBlendMode || 'BLEND';
+                if (mode === 'ADD') p5.blendMode(p5.ADD);
+                else if (mode === 'MULTIPLY') p5.blendMode(p5.MULTIPLY);
+                else if (mode === 'SCREEN') p5.blendMode(p5.SCREEN);
+                else if (mode === 'LIGHTEN') p5.blendMode(p5.LIGHTEN);
+                else if (mode === 'DARKEST') p5.blendMode(p5.DARKEST);
+                else p5.blendMode(p5.BLEND);
+
+                const parallaxX = cameraOffset.x * this.parallaxFactor;
+                const parallaxY = cameraOffset.y * this.parallaxFactor;
+                p5.translate(parallaxX, parallaxY);
+                const separationOffset = (this.depth - 0.5) * 50 * this.separationModulation;
+                p5.translate(0, separationOffset);
+                for (const sprite of this.sprites) {
+                    sprite.display(p5);
+                }
+
+                // Reset blend mode
+                p5.blendMode(p5.BLEND);
+                p5.pop();
+            }
+
+            getSpriteCount() {
+                return this.sprites.length;
+            }
+
+            clear() {
+                this.sprites = [];
+            }
+        }
+
+        // CloudBackground - Phase 2
+        class CloudBackground {
+            constructor(params = {}) {
+                this.params = {
+                    particleCount: params.particleCount || 100,
+                    layerCount: params.layerCount || 3,
+                    baseColor: params.baseColor || { r: 240, g: 245, b: 250 },
+                    opacity: params.opacity || 0.85,
+                    movementSpeed: params.movementSpeed || 0.3,
+                    baseScale: params.baseScale || 40,
+                    seed: params.seed || Math.floor(Math.random() * 10000),
+                    biofeedbackMode: params.biofeedbackMode || false,
+                    scaleNoise: params.scaleNoise || {
+                        large: 512.0,
+                        medium: 12.25,
+                        fine: 0.12
+                    }
+                };
+
+                this.noiseEngine = new CloudNoiseEngine({
+                    seed: this.params.seed,
+                    scaleNoise: this.params.scaleNoise
+                });
+
+                this.layers = [];
+                this.coherenceLevel = 0.5;
+                this.biofeedbackParams = {
+                    opacity: 1.0,
+                    glowRadius: 1.0,
+                    colorTemp: this.params.baseColor,
+                    movementSpeed: 1.0,
+                    layerSeparation: 1.0
+                };
+                this.frameCount = 0;
+                this.isGenerated = false;
+                this.canvasWidth = 0;
+                this.canvasHeight = 0;
+            }
+
+            generate(canvasWidth = null, canvasHeight = null, seed = null) {
+                this.canvasWidth = canvasWidth || (typeof width !== 'undefined' ? width : 800);
+                this.canvasHeight = canvasHeight || (typeof height !== 'undefined' ? height : 600);
+
+                if (seed !== null) {
+                    this.params.seed = seed;
+                    this.noiseEngine.setSeed(seed);
+                }
+
+                this.clearLayers();
+                const layerCount = this.params.layerCount;
+                const particlesPerLayer = Math.floor(this.params.particleCount / layerCount);
+
+                for (let i = 0; i < layerCount; i++) {
+                    const depth = i / (layerCount - 1);
+                    const layer = new CloudLayer(depth, {
+                        particleCount: particlesPerLayer,
+                        baseScale: this.params.baseScale,
+                        baseOpacity: this.params.opacity,
+                        baseColor: this.params.baseColor,
+                        movementSpeed: this.params.movementSpeed
+                    });
+                    layer.generateSprites(this.noiseEngine, this.canvasWidth, this.canvasHeight);
+                    this.layers.push(layer);
+                }
+
+                this.isGenerated = true;
+            }
+
+            update(deltaTime = 16.67) {
+                if (!this.isGenerated) return;
+                this.noiseEngine.update(deltaTime);
+                const currentTime = this.noiseEngine.getTime();
+                for (const layer of this.layers) {
+                    layer.update(
+                        this.noiseEngine,
+                        currentTime,
+                        this.biofeedbackParams,
+                        this.canvasWidth,
+                        this.canvasHeight
+                    );
+                }
+                this.frameCount++;
+            }
+
+            display(p5Instance) {
+                if (!this.isGenerated) return;
+                for (const layer of this.layers) {
+                    layer.display(p5Instance);
+                }
+            }
+
+            regenerate(newSeed = null) {
+                const seed = newSeed || Math.floor(Math.random() * 10000);
+                this.generate(this.canvasWidth, this.canvasHeight, seed);
+                this.noiseEngine.resetTime();
+            }
+
+            resetTime() {
+                this.noiseEngine.resetTime();
+            }
+
+            clearLayers() {
+                for (const layer of this.layers) {
+                    layer.clear();
+                }
+                this.layers = [];
+                this.isGenerated = false;
+            }
+
+            getSpriteCount() {
+                return this.layers.reduce((sum, layer) => sum + layer.getSpriteCount(), 0);
+            }
+        }
+
+        // P5.js sketch
+        let clouds;
+        let controlsMinimized = false;
+        let brushstrokeTextures = [];
+        let cachedTextures = {};  // Cache rendered textures for performance
+
+        // Preload brushstroke textures
+        window.preload = function() {
+            // Load spot brushstrokes for painterly particles
+            for (let i = 1; i <= 5; i++) {
+                brushstrokeTextures.push(loadImage(`assets/brushstrokes/spot-${i}.png`));
+            }
+            console.log(`Loaded ${brushstrokeTextures.length} brushstroke textures`);
+        }
+
+        window.setup = function() {
+            createCanvas(windowWidth, windowHeight);
+
+            clouds = new CloudBackground({
+                particleCount: 100,
+                layerCount: 3,
+                numClouds: 2,  // Fewer clouds per layer
+                baseScale: 90,  // Even larger brushstrokes (was 80)
+                movementSpeed: 0.3,
+                opacity: 0.85,
+                seed: 42
+            });
+
+            clouds.generate();
+
+            // Log sprite count
+            console.log(`Generated ${clouds.getSpriteCount()} sprites across ${clouds.layers.length} layers`);
+
+            frameRate(60);
+        };
+
+        window.draw = function() {
+            background(26, 26, 46);
+
+            clouds.update(16.67);
+            clouds.display(window);
+
+            updateUI();
+        };
+
+        function updateUI() {
+            document.getElementById('fps-display').textContent = Math.round(frameRate());
+            document.getElementById('sprite-count').textContent = clouds.getSpriteCount();
+        }
+
+        window.windowResized = function() {
+            resizeCanvas(windowWidth, windowHeight);
+            clouds.resize(windowWidth, windowHeight);
+        };
+
+        window.keyPressed = function() {
+            if (key === 'c' || key === 'C') {
+                toggleControls();
+            }
+        };
+
+        function toggleControls() {
+            controlsMinimized = !controlsMinimized;
+            document.getElementById('controls').classList.toggle('minimized', controlsMinimized);
+            document.getElementById('toggle-controls').textContent = controlsMinimized ? '+' : '×';
+        }
+
+        // UI Controls
+        document.getElementById('particle-count').addEventListener('input', (e) => {
+            const count = parseInt(e.target.value);
+            document.getElementById('particle-count-value').textContent = count;
+            clouds.params.particleCount = count;
+            clouds.regenerate();
+        });
+
+        document.getElementById('max-speed').addEventListener('input', (e) => {
+            const speed = parseFloat(e.target.value);
+            document.getElementById('max-speed-value').textContent = speed.toFixed(2);
+            // Update movement speed on existing sprites (don't regenerate)
+            clouds.params.movementSpeed = speed;
+            clouds.layers.forEach(layer => {
+                layer.sprites.forEach(sprite => {
+                    sprite.maxSpeed = speed;
+                });
+            });
+        });
+
+        document.getElementById('opacity').addEventListener('input', (e) => {
+            const opacity = parseFloat(e.target.value);
+            document.getElementById('opacity-value').textContent = opacity.toFixed(2);
+            // Update opacity on existing sprites (don't regenerate)
+            clouds.params.opacity = opacity;
+            clouds.layers.forEach(layer => {
+                const depthAlpha = layer.depthAlpha;
+                layer.sprites.forEach(sprite => {
+                    sprite.baseOpacity = opacity * depthAlpha;
+                    sprite.opacity = sprite.baseOpacity;
+                });
+            });
+        });
+
+        // Blend mode selector
+        window.currentBlendMode = 'BLEND';
+        document.getElementById('blend-mode').addEventListener('change', (e) => {
+            window.currentBlendMode = e.target.value;
+            console.log('Blend mode changed to:', window.currentBlendMode);
+        });
+
+        document.getElementById('reset-btn').addEventListener('click', () => {
+            clouds.resetTime();
+        });
+
+        document.getElementById('new-seed-btn').addEventListener('click', () => {
+            clouds.regenerate();
+        });
+
+        document.getElementById('toggle-controls').addEventListener('click', toggleControls);
+    </script>
+</body>
+</html>

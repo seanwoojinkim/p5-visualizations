@@ -1,0 +1,735 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Soft Clouds Demo - Phase 2</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.7.0/p5.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background: #1a1a2e;
+            font-family: 'Monaco', 'Courier New', monospace;
+        }
+
+        canvas {
+            display: block;
+        }
+
+        #controls {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(22, 33, 62, 0.95);
+            padding: 20px;
+            border-radius: 8px;
+            color: #eee;
+            font-size: 12px;
+            min-width: 240px;
+            max-width: 280px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(22, 85, 143, 0.3);
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        #controls.minimized {
+            min-width: 60px;
+            padding: 10px;
+        }
+
+        #controls.minimized h3,
+        #controls.minimized .control-group,
+        #controls.minimized .info-text {
+            display: none;
+        }
+
+        h3 {
+            margin: 0 0 15px 0;
+            font-size: 14px;
+            font-weight: normal;
+            color: #4ecca3;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .control-group {
+            margin-bottom: 15px;
+        }
+
+        .control-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 11px;
+            color: #aaa;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .control-group input[type="range"] {
+            width: 100%;
+            margin-bottom: 3px;
+        }
+
+        .control-group .value-display {
+            color: #4ecca3;
+            font-size: 11px;
+        }
+
+        .control-group button {
+            width: 100%;
+            padding: 8px;
+            background: #0f3460;
+            border: 1px solid #16558f;
+            color: #eee;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background 0.2s;
+            font-family: inherit;
+            font-size: 12px;
+            margin-bottom: 5px;
+        }
+
+        .control-group button:hover {
+            background: #16558f;
+        }
+
+        #toggle-controls {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            width: 24px;
+            height: 24px;
+            padding: 0;
+            background: transparent;
+            border: none;
+            color: #4ecca3;
+            cursor: pointer;
+            font-size: 16px;
+        }
+
+        .info-text {
+            font-size: 11px;
+            color: #888;
+            line-height: 1.4;
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid rgba(22, 85, 143, 0.3);
+        }
+
+        .info-text strong {
+            color: #4ecca3;
+        }
+
+        #info-overlay {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(22, 33, 62, 0.95);
+            padding: 12px 16px;
+            border-radius: 8px;
+            color: #eee;
+            font-size: 11px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(22, 85, 143, 0.3);
+        }
+
+        .info-item {
+            margin: 3px 0;
+        }
+
+        .info-item strong {
+            color: #4ecca3;
+            margin-right: 8px;
+        }
+
+        .section-divider {
+            height: 1px;
+            background: rgba(22, 85, 143, 0.3);
+            margin: 15px 0;
+        }
+    </style>
+</head>
+<body>
+    <div id="controls">
+        <button id="toggle-controls">×</button>
+        <h3>Soft Clouds - Phase 2</h3>
+
+        <div class="control-group">
+            <label>Total Particles</label>
+            <input type="range" id="particle-count" min="30" max="200" step="10" value="100">
+            <div class="value-display"><span id="particle-count-value">100</span> total</div>
+        </div>
+
+        <div class="control-group">
+            <label>Layer Count</label>
+            <input type="range" id="layer-count" min="2" max="5" step="1" value="3">
+            <div class="value-display"><span id="layer-count-value">3</span> layers</div>
+        </div>
+
+        <div class="control-group">
+            <label>Base Size</label>
+            <input type="range" id="base-scale" min="20" max="80" step="5" value="40">
+            <div class="value-display"><span id="base-scale-value">40</span> px</div>
+        </div>
+
+        <div class="control-group">
+            <label>Drift Speed</label>
+            <input type="range" id="drift-speed" min="0.05" max="0.5" step="0.05" value="0.3">
+            <div class="value-display"><span id="drift-speed-value">0.30</span> px/frame</div>
+        </div>
+
+        <div class="control-group">
+            <label>Opacity</label>
+            <input type="range" id="opacity" min="0.4" max="1.0" step="0.05" value="0.85">
+            <div class="value-display"><span id="opacity-value">0.85</span></div>
+        </div>
+
+        <div class="section-divider"></div>
+
+        <div class="control-group">
+            <label>Coherence Level (Biofeedback)</label>
+            <input type="range" id="coherence" min="-1" max="1" step="0.01" value="0">
+            <div class="value-display"><span id="coherence-value">0.00</span></div>
+        </div>
+
+        <div class="section-divider"></div>
+
+        <div class="control-group">
+            <button id="regenerate-btn">New Pattern</button>
+            <button id="reset-time-btn">Reset Time</button>
+        </div>
+
+        <div class="info-text">
+            <strong>Phase 2:</strong> Layered sprite renderer with soft organic forms. CloudSprite uses radial gradients for smooth edges. CloudLayer manages depth-based scaling and parallax. CloudBackground orchestrates the system.
+            <br><br>
+            <strong>Controls:</strong> Press 'C' to toggle controls. Adjust coherence slider to see biofeedback response (Phase 3 preview).
+        </div>
+    </div>
+
+    <div id="info-overlay">
+        <div class="info-item"><strong>FPS:</strong> <span id="fps-display">60</span></div>
+        <div class="info-item"><strong>Sprites:</strong> <span id="sprite-count">0</span></div>
+        <div class="info-item"><strong>Coherence:</strong> <span id="coherence-display">Neutral</span></div>
+    </div>
+
+    <script type="module">
+        // Import cloud system modules
+        // Note: Using relative paths for local development
+        // In production, these would be served from a proper module path
+
+        // Inline modules for standalone demo
+        // CloudNoiseEngine (from Phase 1)
+        class CloudNoiseEngine {
+            constructor(params = {}) {
+                this.scales = {
+                    large: params.scaleNoise?.large || 512.0,
+                    medium: params.scaleNoise?.medium || 12.25,
+                    fine: params.scaleNoise?.fine || 0.12
+                };
+
+                this.weights = {
+                    large: params.weights?.large || 1.0,
+                    medium: params.weights?.medium || 0.3,
+                    fine: params.weights?.fine || 0.1
+                };
+
+                this.timeMultipliers = {
+                    large: 0.0001,
+                    medium: 0.0002,
+                    fine: 0.0003
+                };
+
+                this.seed = params.seed || 0;
+                this.totalWeight = this.weights.large + this.weights.medium + this.weights.fine;
+                this.timeOffset = 0;
+            }
+
+            sample2D(x, y, time = 0) {
+                const nL = noise(
+                    (x + this.seed) / this.scales.large,
+                    y / this.scales.large,
+                    time * this.timeMultipliers.large
+                );
+
+                const nM = noise(
+                    (x + this.seed + 1000) / this.scales.medium,
+                    (y + 500) / this.scales.medium,
+                    time * this.timeMultipliers.medium
+                );
+
+                const nF = noise(
+                    (x + this.seed + 2000) / this.scales.fine,
+                    (y + 1500) / this.scales.fine,
+                    time * this.timeMultipliers.fine
+                );
+
+                const combined = (
+                    nL * this.weights.large +
+                    nM * this.weights.medium +
+                    nF * this.weights.fine
+                );
+
+                return combined / this.totalWeight;
+            }
+
+            getDriftVelocity(sprite, time) {
+                const nx = this.sample2D(sprite.seedX, sprite.seedY, time);
+                const ny = this.sample2D(
+                    sprite.seedX + 10000,
+                    sprite.seedY + 10000,
+                    time
+                );
+
+                return {
+                    x: (nx - 0.5) * sprite.maxSpeed,
+                    y: (ny - 0.5) * sprite.maxSpeed
+                };
+            }
+
+            update(deltaTime) {
+                this.timeOffset += deltaTime;
+            }
+
+            getTime() {
+                return this.timeOffset;
+            }
+
+            resetTime() {
+                this.timeOffset = 0;
+            }
+
+            setSeed(newSeed) {
+                this.seed = newSeed;
+            }
+
+            getConfig() {
+                return {
+                    scales: { ...this.scales },
+                    weights: { ...this.weights },
+                    timeMultipliers: { ...this.timeMultipliers },
+                    seed: this.seed,
+                    totalWeight: this.totalWeight
+                };
+            }
+        }
+
+        // CloudSprite (Phase 2)
+        class CloudSprite {
+            constructor(x, y, layer, params) {
+                this.pos = { x, y };
+                this.seedX = x;
+                this.seedY = y;
+                this.layer = layer;
+                this.depth = layer ? layer.depth : 0.5;
+
+                const sizeVariation = 0.7 + Math.random() * 0.6;
+                this.baseScale = params.baseScale * sizeVariation;
+                this.scale = this.baseScale;
+                this.baseOpacity = params.baseOpacity || 0.8;
+                this.opacity = this.baseOpacity;
+                this.baseColor = params.baseColor || { r: 240, g: 245, b: 250 };
+                this.color = { ...this.baseColor };
+                this.maxSpeed = params.movementSpeed || 0.3;
+                this.glowRadius = 1.0;
+            }
+
+            update(noiseEngine, time, biofeedbackParams, canvasWidth, canvasHeight) {
+                const drift = noiseEngine.getDriftVelocity(this, time);
+                const speedMod = biofeedbackParams?.movementSpeed || 1.0;
+                this.pos.x += drift.x * speedMod;
+                this.pos.y += drift.y * speedMod;
+
+                const buffer = this.scale * 2;
+                if (this.pos.x < -buffer) this.pos.x += canvasWidth + buffer * 2;
+                if (this.pos.x > canvasWidth + buffer) this.pos.x -= canvasWidth + buffer * 2;
+                if (this.pos.y < -buffer) this.pos.y += canvasHeight + buffer * 2;
+                if (this.pos.y > canvasHeight + buffer) this.pos.y -= canvasHeight + buffer * 2;
+
+                if (biofeedbackParams) {
+                    this.opacity = this.baseOpacity * (biofeedbackParams.opacity || 1.0);
+                    this.glowRadius = biofeedbackParams.glowRadius || 1.0;
+                    if (biofeedbackParams.colorTemp) {
+                        this.color = this.lerpColorToward(
+                            this.baseColor,
+                            biofeedbackParams.colorTemp,
+                            0.3
+                        );
+                    }
+                }
+            }
+
+            display(p5) {
+                if (this.opacity <= 0) return;
+                const radius = this.scale * this.glowRadius;
+                this.renderWithRings(p5, radius);
+            }
+
+            renderWithRings(p5, radius) {
+                const rings = 12;
+                const centerAlpha = this.opacity * 255;
+
+                p5.push();
+                p5.noStroke();
+
+                for (let i = rings; i >= 0; i--) {
+                    const r = radius * (i / rings);
+                    const t = i / rings;
+                    const smoothT = this.smoothstep(0, 1, t);
+                    const alpha = smoothT * centerAlpha;
+
+                    p5.fill(this.color.r, this.color.g, this.color.b, alpha);
+                    p5.circle(this.pos.x, this.pos.y, r * 2);
+                }
+
+                p5.pop();
+            }
+
+            smoothstep(edge0, edge1, x) {
+                const t = Math.max(0, Math.min(1, (x - edge0) / (edge1 - edge0)));
+                return t * t * (3 - 2 * t);
+            }
+
+            lerpColorToward(current, target, t) {
+                return {
+                    r: Math.round(current.r + (target.r - current.r) * t),
+                    g: Math.round(current.g + (target.g - current.g) * t),
+                    b: Math.round(current.b + (target.b - current.b) * t)
+                };
+            }
+        }
+
+        // CloudLayer (Phase 2)
+        class CloudLayer {
+            constructor(depth, params = {}) {
+                this.depth = depth;
+                this.sprites = [];
+                this.depthScale = 0.5 + (depth * 0.5);
+                this.depthAlpha = 0.4 + (depth * 0.6);
+                this.parallaxFactor = depth * 0.3;
+                this.params = params;
+                this.separationModulation = 1.0;
+            }
+
+            addSprite(sprite) {
+                sprite.layer = this;
+                sprite.depth = this.depth;
+                sprite.baseScale *= this.depthScale;
+                sprite.scale = sprite.baseScale;
+                sprite.baseOpacity *= this.depthAlpha;
+                sprite.opacity = sprite.baseOpacity;
+                this.sprites.push(sprite);
+            }
+
+            generateSprites(canvasWidth, canvasHeight) {
+                const count = this.params.particleCount || 30;
+                for (let i = 0; i < count; i++) {
+                    const x = Math.random() * canvasWidth;
+                    const y = Math.random() * canvasHeight;
+                    const sprite = new CloudSprite(x, y, this, {
+                        baseScale: this.params.baseScale || 40,
+                        baseOpacity: this.params.baseOpacity || 0.8,
+                        baseColor: this.params.baseColor || { r: 240, g: 245, b: 250 },
+                        movementSpeed: this.params.movementSpeed || 0.3
+                    });
+                    this.addSprite(sprite);
+                }
+            }
+
+            update(noiseEngine, time, biofeedbackParams, canvasWidth, canvasHeight) {
+                if (biofeedbackParams && biofeedbackParams.layerSeparation !== undefined) {
+                    this.separationModulation = biofeedbackParams.layerSeparation;
+                }
+                for (const sprite of this.sprites) {
+                    sprite.update(noiseEngine, time, biofeedbackParams, canvasWidth, canvasHeight);
+                }
+            }
+
+            display(p5, cameraOffset = { x: 0, y: 0 }) {
+                p5.push();
+                const parallaxX = cameraOffset.x * this.parallaxFactor;
+                const parallaxY = cameraOffset.y * this.parallaxFactor;
+                p5.translate(parallaxX, parallaxY);
+                const separationOffset = (this.depth - 0.5) * 50 * this.separationModulation;
+                p5.translate(0, separationOffset);
+                for (const sprite of this.sprites) {
+                    sprite.display(p5);
+                }
+                p5.pop();
+            }
+
+            getSpriteCount() {
+                return this.sprites.length;
+            }
+
+            clear() {
+                this.sprites = [];
+            }
+        }
+
+        // CloudBackground (Phase 2)
+        class CloudBackground {
+            constructor(params = {}) {
+                this.params = {
+                    particleCount: params.particleCount || 100,
+                    layerCount: params.layerCount || 3,
+                    baseColor: params.baseColor || { r: 240, g: 245, b: 250 },
+                    opacity: params.opacity || 0.85,
+                    movementSpeed: params.movementSpeed || 0.3,
+                    baseScale: params.baseScale || 40,
+                    seed: params.seed || Math.floor(Math.random() * 10000),
+                    biofeedbackMode: params.biofeedbackMode || false,
+                    scaleNoise: params.scaleNoise || {
+                        large: 512.0,
+                        medium: 12.25,
+                        fine: 0.12
+                    }
+                };
+
+                this.noiseEngine = new CloudNoiseEngine({
+                    seed: this.params.seed,
+                    scaleNoise: this.params.scaleNoise
+                });
+
+                this.layers = [];
+                this.coherenceLevel = 0.5;
+                this.biofeedbackParams = {
+                    opacity: 1.0,
+                    glowRadius: 1.0,
+                    colorTemp: this.params.baseColor,
+                    movementSpeed: 1.0,
+                    layerSeparation: 1.0
+                };
+                this.frameCount = 0;
+                this.isGenerated = false;
+                this.canvasWidth = 0;
+                this.canvasHeight = 0;
+            }
+
+            generate(canvasWidth = null, canvasHeight = null, seed = null) {
+                this.canvasWidth = canvasWidth || (typeof width !== 'undefined' ? width : 800);
+                this.canvasHeight = canvasHeight || (typeof height !== 'undefined' ? height : 600);
+
+                if (seed !== null) {
+                    this.params.seed = seed;
+                    this.noiseEngine.setSeed(seed);
+                }
+
+                this.clearLayers();
+                const layerCount = this.params.layerCount;
+                const particlesPerLayer = Math.floor(this.params.particleCount / layerCount);
+
+                for (let i = 0; i < layerCount; i++) {
+                    const depth = i / (layerCount - 1);
+                    const layer = new CloudLayer(depth, {
+                        particleCount: particlesPerLayer,
+                        baseScale: this.params.baseScale,
+                        baseOpacity: this.params.opacity,
+                        baseColor: this.params.baseColor,
+                        movementSpeed: this.params.movementSpeed
+                    });
+                    layer.generateSprites(this.canvasWidth, this.canvasHeight);
+                    this.layers.push(layer);
+                }
+
+                this.isGenerated = true;
+            }
+
+            update(deltaTime = 16.67) {
+                if (!this.isGenerated) return;
+                this.noiseEngine.update(deltaTime);
+                const currentTime = this.noiseEngine.getTime();
+                for (const layer of this.layers) {
+                    layer.update(
+                        this.noiseEngine,
+                        currentTime,
+                        this.biofeedbackParams,
+                        this.canvasWidth,
+                        this.canvasHeight
+                    );
+                }
+                this.frameCount++;
+            }
+
+            display(p5Instance) {
+                if (!this.isGenerated) return;
+                for (const layer of this.layers) {
+                    layer.display(p5Instance);
+                }
+            }
+
+            setCoherence(level) {
+                if (!this.params.biofeedbackMode) return;
+                this.coherenceLevel = Math.max(-1, Math.min(1, level));
+                this.biofeedbackParams = this.mapCoherenceToVisuals(this.coherenceLevel);
+            }
+
+            mapCoherenceToVisuals(coherence) {
+                const opacity = coherence < 0
+                    ? 0.6 + (coherence + 1) * 0.2
+                    : 0.8 + coherence * 0.2;
+                const glowRadius = coherence < 0
+                    ? 0.8 + (coherence + 1) * 0.2
+                    : 1.0 + coherence * 0.3;
+                const movementSpeed = 1.0 - Math.abs(coherence) * 0.3;
+                const layerSeparation = 0.7 + coherence * 0.5;
+
+                let colorTemp = { ...this.params.baseColor };
+                if (coherence < -0.5) {
+                    colorTemp = { r: 180, g: 195, b: 210 };
+                } else if (coherence < 0) {
+                    colorTemp = { r: 200, g: 210, b: 220 };
+                } else if (coherence > 0.7) {
+                    colorTemp = { r: 255, g: 245, b: 220 };
+                } else if (coherence > 0.3) {
+                    colorTemp = { r: 245, g: 240, b: 230 };
+                }
+
+                return {
+                    opacity,
+                    glowRadius,
+                    colorTemp,
+                    movementSpeed,
+                    layerSeparation
+                };
+            }
+
+            regenerate(newSeed = null) {
+                const seed = newSeed || Math.floor(Math.random() * 10000);
+                this.generate(this.canvasWidth, this.canvasHeight, seed);
+                this.noiseEngine.resetTime();
+            }
+
+            resetTime() {
+                this.noiseEngine.resetTime();
+            }
+
+            clearLayers() {
+                for (const layer of this.layers) {
+                    layer.clear();
+                }
+                this.layers = [];
+                this.isGenerated = false;
+            }
+
+            getSpriteCount() {
+                return this.layers.reduce((sum, layer) => sum + layer.getSpriteCount(), 0);
+            }
+        }
+
+        // P5.js sketch
+        let clouds;
+        let controlsMinimized = false;
+
+        window.setup = function() {
+            createCanvas(windowWidth, windowHeight);
+
+            clouds = new CloudBackground({
+                particleCount: 100,
+                layerCount: 3,
+                baseScale: 40,
+                movementSpeed: 0.3,
+                opacity: 0.85,
+                biofeedbackMode: true
+            });
+
+            clouds.generate();
+            frameRate(60);
+        };
+
+        window.draw = function() {
+            background(26, 26, 46);
+
+            clouds.update(16.67);
+            clouds.display(window);
+
+            updateUI();
+        };
+
+        function updateUI() {
+            document.getElementById('fps-display').textContent = Math.round(frameRate());
+            document.getElementById('sprite-count').textContent = clouds.getSpriteCount();
+
+            const coherence = clouds.coherenceLevel;
+            let coherenceState = 'Neutral';
+            if (coherence < -0.5) coherenceState = 'High Stress';
+            else if (coherence < 0) coherenceState = 'Low Stress';
+            else if (coherence > 0.7) coherenceState = 'Deep Calm';
+            else if (coherence > 0.3) coherenceState = 'Medium Calm';
+
+            document.getElementById('coherence-display').textContent = coherenceState;
+        }
+
+        window.windowResized = function() {
+            resizeCanvas(windowWidth, windowHeight);
+            clouds.resize(windowWidth, windowHeight);
+        };
+
+        window.keyPressed = function() {
+            if (key === 'c' || key === 'C') {
+                toggleControls();
+            }
+        };
+
+        function toggleControls() {
+            controlsMinimized = !controlsMinimized;
+            document.getElementById('controls').classList.toggle('minimized', controlsMinimized);
+            document.getElementById('toggle-controls').textContent = controlsMinimized ? '+' : '×';
+        }
+
+        // UI Controls
+        document.getElementById('particle-count').addEventListener('input', (e) => {
+            const count = parseInt(e.target.value);
+            document.getElementById('particle-count-value').textContent = count;
+            clouds.params.particleCount = count;
+            clouds.regenerate();
+        });
+
+        document.getElementById('layer-count').addEventListener('input', (e) => {
+            const count = parseInt(e.target.value);
+            document.getElementById('layer-count-value').textContent = count;
+            clouds.params.layerCount = count;
+            clouds.regenerate();
+        });
+
+        document.getElementById('base-scale').addEventListener('input', (e) => {
+            const scale = parseInt(e.target.value);
+            document.getElementById('base-scale-value').textContent = scale;
+            clouds.params.baseScale = scale;
+            clouds.regenerate();
+        });
+
+        document.getElementById('drift-speed').addEventListener('input', (e) => {
+            const speed = parseFloat(e.target.value);
+            document.getElementById('drift-speed-value').textContent = speed.toFixed(2);
+            clouds.params.movementSpeed = speed;
+            clouds.regenerate();
+        });
+
+        document.getElementById('opacity').addEventListener('input', (e) => {
+            const opacity = parseFloat(e.target.value);
+            document.getElementById('opacity-value').textContent = opacity.toFixed(2);
+            clouds.params.opacity = opacity;
+            clouds.regenerate();
+        });
+
+        document.getElementById('coherence').addEventListener('input', (e) => {
+            const coherence = parseFloat(e.target.value);
+            document.getElementById('coherence-value').textContent = coherence.toFixed(2);
+            clouds.setCoherence(coherence);
+        });
+
+        document.getElementById('regenerate-btn').addEventListener('click', () => {
+            clouds.regenerate();
+        });
+
+        document.getElementById('reset-time-btn').addEventListener('click', () => {
+            clouds.resetTime();
+        });
+
+        document.getElementById('toggle-controls').addEventListener('click', toggleControls);
+    </script>
+</body>
+</html>
