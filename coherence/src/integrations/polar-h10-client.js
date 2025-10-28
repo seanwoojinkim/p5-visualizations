@@ -40,6 +40,12 @@ export class PolarH10Client {
         // Smoothing configuration
         this.smoothingFactor = 0.08;  // Lower = smoother transitions
 
+        // Adaptive scaling based on historical peak
+        this.historicalPeakScore = 0;  // Peak coherence score from all sessions
+        this.peakBoost = 10;           // Points above historical peak for max attraction
+        this.enableAdaptiveScaling = true; // Can be toggled
+        this.onPeakUpdate = config.onPeakUpdate || (() => {}); // Callback when new peak reached
+
         // Statistics
         this.latestData = null;
         this.connectionAttempts = 0;
@@ -274,32 +280,89 @@ export class PolarH10Client {
     }
 
     /**
+     * Set historical peak score from database
+     * This allows the visualization to adapt to the user's personal best
+     */
+    setHistoricalPeak(peakScore) {
+        this.historicalPeakScore = Math.max(0, Math.min(100, peakScore));
+        console.log(`[Polar H10] Historical peak set to ${this.historicalPeakScore}/100`);
+    }
+
+    /**
      * Map coherence score (0-100) to coherence level (-1.0 to +1.0)
      *
-     * Adjusted mapping based on realistic HeartMath coherence ranges:
-     *   0-25:   Very low coherence  → -1.0 to -0.5  (strong repulsion)
-     *   25-40:  Low coherence       → -0.5 to 0.0   (weak repulsion)
-     *   40-60:  Medium coherence    → 0.0 to +0.5   (weak attraction) ← coherent breathing
-     *   60-100: High coherence      → +0.5 to +1.0  (strong attraction) ← deep coherence
+     * Two modes:
+     * 1. Adaptive mode (enableAdaptiveScaling = true):
+     *    Uses historical peak to create a "stretch goal" - achieving slightly
+     *    above your personal best gives maximum attraction (+1.0)
      *
-     * This mapping is more responsive to realistic scores:
-     * - Normal resting: 10-40 (shows repulsion to neutral)
-     * - Coherent breathing: 40-70 (shows clear attraction)
-     * - Deep meditation: 70+ (strong synchronization)
+     * 2. Fixed mode (enableAdaptiveScaling = false):
+     *    Uses standard mapping based on typical HeartMath ranges:
+     *      0-25:   Very low coherence  → -1.0 to -0.5  (strong repulsion)
+     *      25-40:  Low coherence       → -0.5 to 0.0   (weak repulsion)
+     *      40-60:  Medium coherence    → 0.0 to +0.5   (weak attraction)
+     *      60-100: High coherence      → +0.5 to +1.0  (strong attraction)
      */
     scoreToLevel(score) {
-        // Piecewise linear mapping for better visual responsiveness
+        // Use adaptive scaling if enabled and we have a historical peak
+        if (this.enableAdaptiveScaling && this.historicalPeakScore > 0) {
+            return this._adaptiveScoreToLevel(score);
+        } else {
+            return this._fixedScoreToLevel(score);
+        }
+    }
+
+    /**
+     * Adaptive mapping that scales based on historical peak
+     * The target is (historicalPeak + peakBoost), which maps to +1.0
+     */
+    _adaptiveScoreToLevel(score) {
+        const target = this.historicalPeakScore + this.peakBoost;
+        let level;
+
+        // Below 40% of target: strong repulsion (-1.0 to -0.5)
+        if (score <= target * 0.4) {
+            const normalized = score / (target * 0.4);
+            level = -1.0 + normalized * 0.5;
+        }
+        // 40-60% of target: weak repulsion (-0.5 to 0.0)
+        else if (score <= target * 0.6) {
+            const normalized = (score - target * 0.4) / (target * 0.2);
+            level = -0.5 + normalized * 0.5;
+        }
+        // 60-90% of target: weak attraction (0.0 to +0.5)
+        else if (score <= target * 0.9) {
+            const normalized = (score - target * 0.6) / (target * 0.3);
+            level = 0.0 + normalized * 0.5;
+        }
+        // 90-100%+ of target: strong attraction (+0.5 to +1.0)
+        else {
+            const normalized = Math.min((score - target * 0.9) / (target * 0.1), 1.0);
+            level = 0.5 + normalized * 0.5;
+        }
+
+        // Log adaptive scaling info occasionally (every ~5 seconds at 60fps = every 300 frames)
+        if (Math.random() < 0.003) {
+            console.log(
+                `[Adaptive] Peak: ${this.historicalPeakScore}, Target: ${target.toFixed(0)}, ` +
+                `Score: ${score.toFixed(0)}, Level: ${level.toFixed(2)}`
+            );
+        }
+
+        return level;
+    }
+
+    /**
+     * Fixed mapping based on typical HeartMath coherence ranges
+     */
+    _fixedScoreToLevel(score) {
         if (score <= 25) {
-            // 0-25: Map to -1.0 to -0.5 (strong repulsion)
             return -1.0 + (score / 25) * 0.5;
         } else if (score <= 40) {
-            // 25-40: Map to -0.5 to 0.0 (weak repulsion)
             return -0.5 + ((score - 25) / 15) * 0.5;
         } else if (score <= 60) {
-            // 40-60: Map to 0.0 to +0.5 (weak attraction)
             return 0.0 + ((score - 40) / 20) * 0.5;
         } else {
-            // 60-100: Map to +0.5 to +1.0 (strong attraction)
             return 0.5 + Math.min((score - 60) / 40, 1.0) * 0.5;
         }
     }

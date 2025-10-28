@@ -176,6 +176,19 @@ window.setup = function() {
         }
     });
 
+    // Load historical peak for adaptive scaling (async, after database is ready)
+    // We wait for sessionRecorder to be initialized before loading the peak
+    setTimeout(async () => {
+        try {
+            const personalBests = await sessionRecorder.db.getPersonalBests();
+            if (personalBests.maxCoherence.value > 0) {
+                polarClient.setHistoricalPeak(personalBests.maxCoherence.value);
+            }
+        } catch (error) {
+            console.error('[Setup] Failed to load historical peak for polarClient:', error);
+        }
+    }, 1000); // Give database time to initialize
+
     // Create control panel with callbacks (minimized by default)
     controlPanel = new ControlPanel(params, {
         onCoherenceLevelChange: (value) => {
