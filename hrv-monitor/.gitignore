@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual environments
+venv/
+env/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+logs/*.log
+!logs/.gitkeep
+
+# Config overrides
+config/local.yaml
+
+# OS
+.DS_Store
+.polar_reminder_shown
+
+# Test outputs
+*.coverage
+htmlcov/

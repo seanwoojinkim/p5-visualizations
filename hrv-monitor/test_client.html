@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HRV Monitor Test Client</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Courier New', monospace;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #fff;
+            padding: 40px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            font-size: 24px;
+            margin-bottom: 30px;
+            letter-spacing: -0.5px;
+        }
+
+        .status {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+
+        .status-indicator.connected {
+            background: #4ade80;
+            box-shadow: 0 0 10px #4ade80;
+        }
+
+        .status-indicator.disconnected {
+            background: #f87171;
+        }
+
+        .metric {
+            margin: 15px 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .metric-label {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            opacity: 0.7;
+        }
+
+        .metric-value {
+            font-size: 28px;
+            font-weight: bold;
+            letter-spacing: -1px;
+        }
+
+        .coherence-bar {
+            width: 100%;
+            height: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 10px;
+        }
+
+        .coherence-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #f87171 0%, #fbbf24 33%, #4ade80 67%, #22d3ee 100%);
+            width: 0%;
+            transition: width 0.5s ease;
+        }
+
+        .level-indicator {
+            font-size: 12px;
+            margin-top: 5px;
+            opacity: 0.8;
+        }
+
+        .data-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .data-item {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 15px;
+            border-radius: 6px;
+        }
+
+        .data-item-label {
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            opacity: 0.6;
+            margin-bottom: 5px;
+        }
+
+        .data-item-value {
+            font-size: 18px;
+        }
+
+        .log {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+            padding: 20px;
+            margin-top: 30px;
+            max-height: 300px;
+            overflow-y: auto;
+            font-size: 11px;
+            line-height: 1.6;
+        }
+
+        .log-entry {
+            margin: 5px 0;
+            opacity: 0.8;
+        }
+
+        .log-time {
+            opacity: 0.5;
+            margin-right: 10px;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .updating {
+            animation: pulse 1s ease-in-out infinite;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Polar H10 HRV Monitor</h1>
+
+        <div class="status">
+            <div class="metric">
+                <div>
+                    <span class="status-indicator" id="wsStatus"></span>
+                    <span id="wsStatusText">Connecting...</span>
+                </div>
+                <div>
+                    <span class="status-indicator" id="polarStatus"></span>
+                    <span id="polarStatusText">Polar H10</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="status">
+            <div class="metric">
+                <span class="metric-label">Coherence Score</span>
+                <span class="metric-value" id="coherenceScore">--</span>
+            </div>
+            <div class="coherence-bar">
+                <div class="coherence-fill" id="coherenceFill"></div>
+            </div>
+            <div class="level-indicator" id="coherenceLevel">Waiting for data...</div>
+        </div>
+
+        <div class="data-grid">
+            <div class="data-item">
+                <div class="data-item-label">Heart Rate</div>
+                <div class="data-item-value" id="heartRate">-- bpm</div>
+            </div>
+
+            <div class="data-item">
+                <div class="data-item-label">Peak Frequency</div>
+                <div class="data-item-value" id="peakFreq">-- Hz</div>
+            </div>
+
+            <div class="data-item">
+                <div class="data-item-label">Coherence Ratio</div>
+                <div class="data-item-value" id="coherenceRatio">--</div>
+            </div>
+
+            <div class="data-item">
+                <div class="data-item-label">Beats Used</div>
+                <div class="data-item-value" id="beatsUsed">--</div>
+            </div>
+        </div>
+
+        <div class="log" id="log">
+            <div class="log-entry">
+                <span class="log-time">[--:--:--]</span>
+                Waiting for WebSocket connection...
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // WebSocket connection
+        const ws = new WebSocket('ws://localhost:8765');
+
+        // DOM elements
+        const wsStatus = document.getElementById('wsStatus');
+        const wsStatusText = document.getElementById('wsStatusText');
+        const polarStatus = document.getElementById('polarStatus');
+        const polarStatusText = document.getElementById('polarStatusText');
+        const coherenceScore = document.getElementById('coherenceScore');
+        const coherenceFill = document.getElementById('coherenceFill');
+        const coherenceLevel = document.getElementById('coherenceLevel');
+        const heartRate = document.getElementById('heartRate');
+        const peakFreq = document.getElementById('peakFreq');
+        const coherenceRatio = document.getElementById('coherenceRatio');
+        const beatsUsed = document.getElementById('beatsUsed');
+        const log = document.getElementById('log');
+
+        // Logging
+        function addLog(message) {
+            const now = new Date();
+            const time = now.toLocaleTimeString();
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            entry.innerHTML = `<span class="log-time">[${time}]</span>${message}`;
+            log.appendChild(entry);
+            log.scrollTop = log.scrollHeight;
+        }
+
+        // WebSocket handlers
+        ws.onopen = () => {
+            wsStatus.className = 'status-indicator connected';
+            wsStatusText.textContent = 'Connected';
+            addLog('✓ Connected to HRV Monitor service');
+        };
+
+        ws.onerror = (error) => {
+            wsStatus.className = 'status-indicator disconnected';
+            wsStatusText.textContent = 'Error';
+            addLog('✗ WebSocket error');
+            console.error('WebSocket error:', error);
+        };
+
+        ws.onclose = () => {
+            wsStatus.className = 'status-indicator disconnected';
+            wsStatusText.textContent = 'Disconnected';
+            addLog('Connection closed');
+        };
+
+        ws.onmessage = (event) => {
+            const message = JSON.parse(event.data);
+
+            if (message.type === 'initial_state') {
+                addLog('Received initial state');
+                updateConnectionStatus(message.connection_status);
+            }
+
+            if (message.type === 'coherence_update') {
+                updateCoherenceData(message.data);
+            }
+
+            if (message.type === 'buffer_status') {
+                updateBufferStatus(message.data);
+            }
+
+            if (message.type === 'connection_status') {
+                updateConnectionStatus(message.data);
+            }
+        };
+
+        function updateConnectionStatus(status) {
+            if (status.polar_h10_connected) {
+                polarStatus.className = 'status-indicator connected';
+                polarStatusText.textContent = `${status.device_name} Connected`;
+                addLog(`✓ ${status.device_name} connected`);
+            } else {
+                polarStatus.className = 'status-indicator disconnected';
+                polarStatusText.textContent = 'Polar H10 Disconnected';
+            }
+        }
+
+        function updateCoherenceData(data) {
+            if (data.status === 'valid') {
+                const score = data.coherence;
+
+                // Update score
+                coherenceScore.textContent = score;
+                coherenceScore.className = 'metric-value updating';
+                setTimeout(() => coherenceScore.classList.remove('updating'), 500);
+
+                // Update bar
+                coherenceFill.style.width = `${score}%`;
+
+                // Update level text
+                let level = '';
+                if (score < 33) {
+                    level = 'Low Coherence - Chaotic HRV pattern';
+                } else if (score < 67) {
+                    level = 'Medium Coherence - Some rhythmic patterns';
+                } else {
+                    level = 'High Coherence - Strong sine-wave pattern';
+                }
+                coherenceLevel.textContent = level;
+
+                // Update detailed metrics
+                peakFreq.textContent = `${data.peak_frequency.toFixed(3)} Hz`;
+                coherenceRatio.textContent = data.ratio.toFixed(2);
+                beatsUsed.textContent = data.beats_used;
+
+                // Log
+                addLog(`Coherence: ${score}/100 (ratio=${data.ratio.toFixed(2)}, peak=${data.peak_frequency.toFixed(3)} Hz)`);
+            } else {
+                coherenceLevel.textContent = data.status;
+                addLog(`Status: ${data.status}`);
+            }
+        }
+
+        function updateBufferStatus(data) {
+            if (data.buffer_ready) {
+                const hr = data.mean_heart_rate.toFixed(1);
+                heartRate.textContent = `${hr} bpm`;
+            } else {
+                const progress = `${data.beats_in_buffer}/${data.min_beats_required}`;
+                heartRate.textContent = progress;
+            }
+        }
+    </script>
+</body>
+</html>

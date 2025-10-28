@@ -1,0 +1,71 @@
+# Polar H10 Heart Rate Monitor Configuration
+# HeartMath Coherence Calculation Settings
+
+# Polar H10 Connection
+polar:
+  device_name: "Polar H10"
+  # Polar H10 uses standard Bluetooth LE Heart Rate Service
+  heart_rate_service_uuid: "0000180d-0000-1000-8000-00805f9b34fb"
+  heart_rate_measurement_uuid: "00002a37-0000-1000-8000-00805f9b34fb"
+  # Auto-reconnect settings
+  auto_reconnect: true
+  reconnect_delay: 5  # seconds
+  max_reconnect_attempts: 10
+
+# Coherence Calculation
+coherence:
+  # Window settings
+  window_duration: 60  # seconds (45-60 recommended)
+  update_interval: 3   # seconds between coherence updates
+  min_beats_required: 30  # minimum beats for calculation
+
+  # Resampling
+  resample_rate: 4  # Hz (standard for HRV analysis)
+
+  # FFT settings
+  fft_size: 256  # samples
+
+  # Frequency ranges (Hz)
+  coherence_min_freq: 0.04  # Lower bound of coherence range
+  coherence_max_freq: 0.26  # Upper bound of coherence range
+  peak_window_width: 0.030  # ±0.015 Hz around peak
+  target_coherence_freq: 0.1  # Resonant frequency (6 breaths/min)
+
+  # Scoring thresholds
+  low_coherence_threshold: 0.9   # ratio threshold for low coherence
+  high_coherence_threshold: 7.0  # ratio threshold for high coherence
+
+# WebSocket Server
+websocket:
+  host: "0.0.0.0"
+  port: 8765
+  # CORS settings
+  cors_origins:
+    - "http://localhost:8000"
+    - "http://localhost:8080"
+    - "http://localhost:8123"
+
+# Visualization Integration
+visualization:
+  # Map coherence score (0-100) to coherence level (-1.0 to +1.0)
+  # for the existing coherence visualization
+  score_to_level_mapping:
+    low_score: 0      # Maps to -1.0 (full repulsion)
+    medium_score: 50  # Maps to 0.0 (neutral)
+    high_score: 100   # Maps to +1.0 (full coherence)
+
+  # Smoothing for visual transitions
+  smoothing_factor: 0.1  # Lerp factor (0.0-1.0)
+
+# Logging
+logging:
+  level: "INFO"  # DEBUG, INFO, WARNING, ERROR
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  file: "logs/hrv-monitor.log"
+  console: true
+
+# Calibration
+calibration:
+  enabled: true
+  duration: 60  # seconds
+  message: "Calibrating... Please remain still and breathe normally"
