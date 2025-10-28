@@ -175,6 +175,25 @@ export class HRVDatabase {
      * @returns {Promise<Object>} Updated session object with statistics
      */
     async endSession(sessionId) {
+        // Get the session first to access startTime
+        const session = await new Promise((resolve, reject) => {
+            const transaction = this.db.transaction(['sessions'], 'readonly');
+            const store = transaction.objectStore('sessions');
+            const request = store.get(sessionId);
+
+            request.onsuccess = () => {
+                if (!request.result) {
+                    reject(new Error(`Session ${sessionId} not found`));
+                } else {
+                    resolve(request.result);
+                }
+            };
+
+            request.onerror = () => {
+                reject(request.error);
+            };
+        });
+
         // Get all samples for the session
         const samples = await this.getSamples(sessionId);
 
@@ -201,10 +220,9 @@ export class HRVDatabase {
         // Calculate time in zones
         stats.timeInZones = calculateTimeInZones(samples);
 
-        // Calculate duration
-        const firstTimestamp = samples[0].timestamp;
-        const lastTimestamp = samples[samples.length - 1].timestamp;
-        stats.durationSeconds = (lastTimestamp - firstTimestamp) / 1000;
+        // Calculate duration using session startTime and current endTime
+        const now = Date.now();
+        stats.durationSeconds = Math.round((now - session.startTime) / 1000);
 
         // Calculate achievement score
         stats.achievementScore = calculateAchievementScore(
@@ -214,7 +232,6 @@ export class HRVDatabase {
         );
 
         // Update session record
-        const now = Date.now();
         const updates = {
             ...stats,
             endTime: now,
