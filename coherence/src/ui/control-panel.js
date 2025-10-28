@@ -4,10 +4,13 @@
  */
 
 export class ControlPanel {
-    constructor(params, callbacks = {}) {
+    constructor(params, callbacks = {}, options = {}) {
         this.params = params;
         this.callbacks = callbacks;
         this.controls = {};
+        this.isMinimized = options.startMinimized !== undefined ? options.startMinimized : false;
+        this.panel = null;
+        this.content = null;
 
         this.createControls();
     }
@@ -17,31 +20,58 @@ export class ControlPanel {
      */
     createControls() {
         // Container for controls
-        const panel = createDiv();
-        panel.style('position', 'fixed');
-        panel.style('bottom', '20px');
-        panel.style('left', '50%');
-        panel.style('transform', 'translateX(-50%)');
-        panel.style('background', 'rgba(20, 20, 20, 0.95)');
-        panel.style('padding', '20px 30px');
-        panel.style('border-radius', '15px');
-        panel.style('color', 'white');
-        panel.style('font-family', '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif');
-        panel.style('box-shadow', '0 10px 40px rgba(0, 0, 0, 0.5)');
-        panel.style('backdrop-filter', 'blur(10px)');
-        panel.style('z-index', '1000');
+        this.panel = createDiv();
+        this.panel.style('position', 'fixed');
+        this.panel.style('bottom', '20px');
+        this.panel.style('left', '50%');
+        this.panel.style('transform', 'translateX(-50%)');
+        this.panel.style('background', 'rgba(20, 20, 20, 0.95)');
+        this.panel.style('padding', '20px 30px');
+        this.panel.style('border-radius', '15px');
+        this.panel.style('color', 'white');
+        this.panel.style('font-family', '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif');
+        this.panel.style('box-shadow', '0 10px 40px rgba(0, 0, 0, 0.5)');
+        this.panel.style('backdrop-filter', 'blur(10px)');
+        this.panel.style('z-index', '1000');
 
-        // Title
+        // Title bar with minimize button
+        const titleBar = createDiv();
+        titleBar.style('display', 'flex');
+        titleBar.style('justify-content', 'space-between');
+        titleBar.style('align-items', 'center');
+        titleBar.style('margin-bottom', '15px');
+        titleBar.parent(this.panel);
+
         const title = createDiv('Coherence Control');
         title.style('font-size', '18px');
         title.style('font-weight', 'bold');
-        title.style('margin-bottom', '15px');
+        title.style('flex-grow', '1');
         title.style('text-align', 'center');
-        title.parent(panel);
+        title.parent(titleBar);
+
+        // Minimize/expand button
+        const minimizeBtn = createButton('−');
+        minimizeBtn.style('background', 'rgba(255, 255, 255, 0.1)');
+        minimizeBtn.style('border', 'none');
+        minimizeBtn.style('color', 'white');
+        minimizeBtn.style('width', '24px');
+        minimizeBtn.style('height', '24px');
+        minimizeBtn.style('border-radius', '4px');
+        minimizeBtn.style('cursor', 'pointer');
+        minimizeBtn.style('font-size', '18px');
+        minimizeBtn.style('line-height', '18px');
+        minimizeBtn.style('padding', '0');
+        minimizeBtn.mousePressed(() => this.toggleMinimize());
+        minimizeBtn.parent(titleBar);
+        this.controls.minimizeBtn = minimizeBtn;
+
+        // Content container
+        this.content = createDiv();
+        this.content.parent(this.panel);
 
         // Simulation mode toggle
         this.createToggle(
-            panel,
+            this.content,
             'simulationMode',
             'Biometric Simulation Mode',
             this.params.simulationMode,
@@ -66,17 +96,17 @@ export class ControlPanel {
         );
 
         // Sequence selector (dropdown)
-        this.createSequenceSelector(panel, 'sequenceSelector');
+        this.createSequenceSelector(this.content, 'sequenceSelector');
 
         // Divider
         const divider = createDiv();
         divider.style('border-top', '1px solid rgba(255, 255, 255, 0.2)');
         divider.style('margin', '15px 0');
-        divider.parent(panel);
+        divider.parent(this.content);
 
         // Coherence slider
         this.createSlider(
-            panel,
+            this.content,
             'coherenceLevel',
             'Coherence Level (Manual)',
             this.params.coherenceLevel,
@@ -93,7 +123,7 @@ export class ControlPanel {
 
         // Boid count slider
         this.createSlider(
-            panel,
+            this.content,
             'numBoidsPerGroup',
             'Boids per Group',
             this.params.numBoidsPerGroup,
@@ -110,7 +140,7 @@ export class ControlPanel {
 
         // Toggle buttons
         this.createToggle(
-            panel,
+            this.content,
             'showTrails',
             'Show Trails',
             this.params.showTrails,
@@ -123,7 +153,7 @@ export class ControlPanel {
         );
 
         this.createToggle(
-            panel,
+            this.content,
             'showDebugInfo',
             'Debug Info',
             this.params.showDebugInfo,
@@ -136,7 +166,7 @@ export class ControlPanel {
         );
 
         this.createToggle(
-            panel,
+            this.content,
             'pauseSimulation',
             'Pause',
             this.params.pauseSimulation,
@@ -149,7 +179,7 @@ export class ControlPanel {
         );
 
         this.createToggle(
-            panel,
+            this.content,
             'lowQualityMode',
             'Performance Mode',
             this.params.lowQualityMode,
@@ -161,9 +191,28 @@ export class ControlPanel {
             }
         );
 
+        // Session recording button
+        const sessionBtn = createButton('Start Session');
+        sessionBtn.style('margin-top', '15px');
+        sessionBtn.style('padding', '8px 20px');
+        sessionBtn.style('background', '#ef4444');
+        sessionBtn.style('color', 'white');
+        sessionBtn.style('border', 'none');
+        sessionBtn.style('border-radius', '8px');
+        sessionBtn.style('cursor', 'pointer');
+        sessionBtn.style('font-size', '14px');
+        sessionBtn.style('width', '100%');
+        sessionBtn.mousePressed(() => {
+            if (this.callbacks.onSessionToggle) {
+                this.callbacks.onSessionToggle();
+            }
+        });
+        sessionBtn.parent(this.content);
+        this.controls.sessionBtn = sessionBtn;
+
         // Reset button
         const resetBtn = createButton('Reset');
-        resetBtn.style('margin-top', '15px');
+        resetBtn.style('margin-top', '10px');
         resetBtn.style('padding', '8px 20px');
         resetBtn.style('background', '#3b82f6');
         resetBtn.style('color', 'white');
@@ -177,7 +226,13 @@ export class ControlPanel {
                 this.callbacks.onReset();
             }
         });
-        resetBtn.parent(panel);
+        resetBtn.parent(this.content);
+
+        // Apply initial minimize state
+        if (this.isMinimized) {
+            this.content.style('display', 'none');
+            this.controls.minimizeBtn.html('+');
+        }
     }
 
     /**
@@ -280,6 +335,37 @@ export class ControlPanel {
     updateControl(id, value) {
         if (this.controls[id]) {
             this.controls[id].value(value);
+        }
+    }
+
+    /**
+     * Toggle minimize/expand state
+     */
+    toggleMinimize() {
+        this.isMinimized = !this.isMinimized;
+
+        if (this.isMinimized) {
+            this.content.style('display', 'none');
+            this.controls.minimizeBtn.html('+');
+        } else {
+            this.content.style('display', 'block');
+            this.controls.minimizeBtn.html('−');
+        }
+    }
+
+    /**
+     * Update session recording button state
+     * @param {boolean} isRecording - Whether recording is active
+     */
+    updateSessionButton(isRecording) {
+        if (this.controls.sessionBtn) {
+            if (isRecording) {
+                this.controls.sessionBtn.html('Stop Session');
+                this.controls.sessionBtn.style('background', '#22c55e');
+            } else {
+                this.controls.sessionBtn.html('Start Session');
+                this.controls.sessionBtn.style('background', '#ef4444');
+            }
         }
     }
 }

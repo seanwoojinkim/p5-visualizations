@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Coherence Visualization - Polar H10</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.7.0/p5.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+        }
+        canvas {
+            display: block;
+        }
+
+        /* Startup instructions overlay */
+        #instructions {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.9);
+            color: white;
+            padding: 40px;
+            border-radius: 12px;
+            max-width: 600px;
+            font-size: 14px;
+            line-height: 1.6;
+            z-index: 1000;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+        }
+
+        #instructions h2 {
+            margin-top: 0;
+            font-size: 20px;
+            font-weight: 500;
+            margin-bottom: 20px;
+        }
+
+        #instructions h3 {
+            font-size: 16px;
+            font-weight: 500;
+            margin-top: 20px;
+            margin-bottom: 10px;
+            color: #4ade80;
+        }
+
+        #instructions ul {
+            margin: 10px 0;
+            padding-left: 20px;
+        }
+
+        #instructions li {
+            margin: 5px 0;
+        }
+
+        #instructions code {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+        }
+
+        #instructions .key {
+            display: inline-block;
+            background: rgba(255, 255, 255, 0.2);
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        #instructions button {
+            background: #4ade80;
+            color: black;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 20px;
+            width: 100%;
+        }
+
+        #instructions button:hover {
+            background: #22c55e;
+        }
+
+        #instructions .warning {
+            background: rgba(251, 191, 36, 0.2);
+            border-left: 3px solid #fbbf24;
+            padding: 10px;
+            margin: 15px 0;
+            border-radius: 4px;
+        }
+
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <!-- Startup Instructions -->
+    <div id="instructions">
+        <h2>Coherence Visualization - Polar H10 Edition</h2>
+
+        <h3>How to Use</h3>
+        <ul>
+            <li><span class="key">P</span> - Toggle Polar H10 mode (real HRV data)</li>
+            <li><span class="key">X</span> - Start/Stop session recording (Polar H10 mode only)</li>
+            <li><span class="key">S</span> - Toggle simulation mode</li>
+            <li><span class="key">B</span> - Toggle breathing guide</li>
+            <li><span class="key">↑ ↓</span> - Adjust breathing rate</li>
+            <li><span class="key">C</span> - Toggle control panel</li>
+            <li><span class="key">Space</span> - Pause/unpause</li>
+            <li><span class="key">R</span> - Reset simulation</li>
+            <li><span class="key">← →</span> - Adjust coherence (manual mode)</li>
+        </ul>
+
+        <h3>Using Polar H10</h3>
+        <ol>
+            <li>Start the HRV Monitor service:
+                <br><code>cd /workspace/hrv-monitor && ./run.sh</code>
+            </li>
+            <li>Wear your Polar H10 with moistened electrodes</li>
+            <li>Wait for the service to connect (~10 seconds)</li>
+            <li>Press <span class="key">P</span> in this visualization</li>
+        </ol>
+
+        <div class="warning">
+            <strong>Note:</strong> The HRV Monitor service must be running on your Mac (not in Docker) for Bluetooth access.
+        </div>
+
+        <h3>Modes</h3>
+        <ul>
+            <li><strong>Manual:</strong> Control coherence with slider/arrow keys</li>
+            <li><strong>Simulation:</strong> Automated biometric simulation</li>
+            <li><strong>Polar H10:</strong> Real-time heart rate coherence</li>
+        </ul>
+
+        <button onclick="document.getElementById('instructions').classList.add('hidden')">
+            Start Visualization
+        </button>
+    </div>
+
+    <script type="module" src="src/apps/coherence-app-polar.js"></script>
+</body>
+</html>
