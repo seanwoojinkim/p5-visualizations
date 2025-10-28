@@ -405,6 +405,164 @@ export class HRVDatabase {
     }
 
     /**
+     * Get daily averages for the last N days
+     * @param {number} days - Number of days to include (default: 30)
+     * @returns {Promise<Object[]>} Array of {date, avgCoherence, count, totalDuration, avgDuration}
+     */
+    async getDailyAverages(days = 30) {
+        const allSessions = await this.getAllSessions();
+        const completedSessions = allSessions.filter(s => s.endTime !== null);
+
+        if (completedSessions.length === 0) {
+            return [];
+        }
+
+        // Group sessions by day
+        const sessionsByDay = {};
+
+        for (const session of completedSessions) {
+            const date = new Date(session.startTime);
+            date.setHours(0, 0, 0, 0);
+            const dateKey = date.toISOString().split('T')[0]; // YYYY-MM-DD
+
+            if (!sessionsByDay[dateKey]) {
+                sessionsByDay[dateKey] = {
+                    date: dateKey,
+                    timestamp: date.getTime(),
+                    sessions: []
+                };
+            }
+
+            sessionsByDay[dateKey].sessions.push(session);
+        }
+
+        // Calculate daily averages
+        const dailyAverages = [];
+        for (const dateKey in sessionsByDay) {
+            const dayData = sessionsByDay[dateKey];
+            const sessions = dayData.sessions;
+
+            const totalCoherence = sessions.reduce((sum, s) => sum + s.meanCoherence, 0);
+            const totalDuration = sessions.reduce((sum, s) => sum + s.durationSeconds, 0);
+
+            dailyAverages.push({
+                date: dayData.date,
+                timestamp: dayData.timestamp,
+                avgCoherence: totalCoherence / sessions.length,
+                count: sessions.length,
+                totalDuration: totalDuration,
+                avgDuration: totalDuration / sessions.length
+            });
+        }
+
+        // Sort by date (oldest to newest)
+        dailyAverages.sort((a, b) => a.timestamp - b.timestamp);
+
+        // Return last N days
+        return dailyAverages.slice(-days);
+    }
+
+    /**
+     * Get aggregate statistics for the last N days
+     * @param {number} days - Number of days to include (default: 30)
+     * @returns {Promise<Object>} Aggregate stats
+     */
+    async getAggregateStats(days = 30) {
+        const cutoffTime = Date.now() - (days * 86400000);
+        const allSessions = await this.getAllSessions();
+        const recentSessions = allSessions.filter(s =>
+            s.endTime !== null && s.startTime >= cutoffTime
+        );
+
+        if (recentSessions.length === 0) {
+            return {
+                totalSessions: 0,
+                totalDuration: 0,
+                avgDuration: 0,
+                avgCoherence: 0,
+                avgHeartRate: 0,
+                totalTimeInHigh: 0,
+                avgTimeInHigh: 0
+            };
+        }
+
+        const totalSessions = recentSessions.length;
+        const totalDuration = recentSessions.reduce((sum, s) => sum + s.durationSeconds, 0);
+        const totalCoherence = recentSessions.reduce((sum, s) => sum + s.meanCoherence, 0);
+        const totalHeartRate = recentSessions.reduce((sum, s) => sum + s.meanHeartRate, 0);
+        const totalTimeInHigh = recentSessions.reduce((sum, s) => sum + s.timeInZones.high.seconds, 0);
+
+        return {
+            totalSessions,
+            totalDuration,
+            avgDuration: totalDuration / totalSessions,
+            avgCoherence: totalCoherence / totalSessions,
+            avgHeartRate: totalHeartRate / totalSessions,
+            totalTimeInHigh,
+            avgTimeInHigh: totalTimeInHigh / totalSessions
+        };
+    }
+
+    /**
+     * Get personal bests (all-time records)
+     * @returns {Promise<Object>} Personal bests
+     */
+    async getPersonalBests() {
+        const allSessions = await this.getAllSessions();
+        const completedSessions = allSessions.filter(s => s.endTime !== null);
+
+        if (completedSessions.length === 0) {
+            return {
+                maxCoherence: { value: 0, date: null, sessionId: null },
+                longestSession: { duration: 0, date: null, sessionId: null },
+                highestAchievementScore: { score: 0, date: null, sessionId: null }
+            };
+        }
+
+        // Find max coherence
+        let maxCoherenceSession = completedSessions[0];
+        for (const session of completedSessions) {
+            if (session.maxCoherence > maxCoherenceSession.maxCoherence) {
+                maxCoherenceSession = session;
+            }
+        }
+
+        // Find longest session
+        let longestSession = completedSessions[0];
+        for (const session of completedSessions) {
+            if (session.durationSeconds > longestSession.durationSeconds) {
+                longestSession = session;
+            }
+        }
+
+        // Find highest achievement score
+        let highestScoreSession = completedSessions[0];
+        for (const session of completedSessions) {
+            if (session.achievementScore > highestScoreSession.achievementScore) {
+                highestScoreSession = session;
+            }
+        }
+
+        return {
+            maxCoherence: {
+                value: maxCoherenceSession.maxCoherence,
+                date: maxCoherenceSession.startTime,
+                sessionId: maxCoherenceSession.sessionId
+            },
+            longestSession: {
+                duration: longestSession.durationSeconds,
+                date: longestSession.startTime,
+                sessionId: longestSession.sessionId
+            },
+            highestAchievementScore: {
+                score: highestScoreSession.achievementScore,
+                date: highestScoreSession.startTime,
+                sessionId: highestScoreSession.sessionId
+            }
+        };
+    }
+
+    /**
      * Close the database connection
      */
     close() {

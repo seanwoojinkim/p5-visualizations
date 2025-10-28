@@ -11,6 +11,7 @@ import { SequencePlayer } from '../core/biometric-simulator.js';
 import { PolarH10Client } from '../integrations/polar-h10-client.js';
 import { SessionRecorder } from '../session/session-recorder.js';
 import { SessionHistory } from '../ui/session-history.js';
+import { ProgressDashboard } from '../ui/progress-dashboard.js';
 
 // Global state
 let params;
@@ -21,6 +22,7 @@ let sequencePlayer;
 let polarClient;
 let sessionRecorder;
 let sessionHistory;
+let progressDashboard;
 
 // Polar H10 state
 let polarMode = false;  // Toggle between Polar H10 and simulation/manual modes
@@ -94,6 +96,14 @@ window.setup = function() {
         sessionRecorder.db,
         () => {
             console.log('[Setup] Session history refreshed');
+        }
+    );
+
+    // Initialize progress dashboard
+    progressDashboard = new ProgressDashboard(
+        sessionRecorder.db,
+        () => {
+            console.log('[Setup] Progress dashboard refreshed');
         }
     );
 
@@ -682,6 +692,11 @@ async function toggleSessionRecording() {
             if (sessionHistory && sessionHistory.isVisible) {
                 await sessionHistory.refresh();
             }
+
+            // Refresh progress dashboard if visible
+            if (progressDashboard && progressDashboard.isVisible) {
+                await progressDashboard.refresh();
+            }
         } catch (error) {
             console.error('[Session] Failed to stop recording:', error);
             alert('Failed to stop recording: ' + error.message);
@@ -775,13 +790,13 @@ function printInstructions() {
     console.log('  P = Toggle Polar H10 mode (real HRV data)');
     console.log('  X = Start/Stop session recording (Polar H10 mode only)');
     console.log('  H = Toggle session history panel');
+    console.log('  D = Toggle progress dashboard (trends & stats)');
     console.log('  S = Toggle simulation mode');
     console.log('  B = Toggle breathing guide (coherent breathing)');
     console.log('  ↑ ↓ = Adjust breathing rate (find your resonance frequency)');
     console.log('  C = Toggle control panel');
     console.log('  Space = Pause/unpause');
     console.log('  R = Reset simulation');
-    console.log('  D = Toggle debug info');
     console.log('  T = Toggle trails');
     console.log('  ← → = Adjust coherence (manual mode only)');
     console.log('');
@@ -845,6 +860,14 @@ window.keyPressed = function() {
         return;
     }
 
+    // D = toggle progress dashboard
+    if (key === 'd' || key === 'D') {
+        if (progressDashboard) {
+            progressDashboard.toggle();
+        }
+        return;
+    }
+
     // Space = pause/unpause
     if (key === ' ') {
         params.pauseSimulation = !params.pauseSimulation;
@@ -854,12 +877,6 @@ window.keyPressed = function() {
     // R = reset
     if (key === 'r' || key === 'R') {
         resetSimulation();
-    }
-
-    // D = toggle debug
-    if (key === 'd' || key === 'D') {
-        params.showDebugInfo = !params.showDebugInfo;
-        controlPanel.updateControl('showDebugInfo', params.showDebugInfo);
     }
 
     // T = toggle trails
