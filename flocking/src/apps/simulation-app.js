@@ -15,6 +15,7 @@ import { SVGParser } from '../core/svg-parser.js';
 import { RENDERING_CONFIG } from '../core/rendering-config.js';
 import { LilypadManager } from '../environment/lilypad-manager.js';
 import { BlossomManager } from '../environment/blossom-manager.js';
+import { WaterBackground } from '../rendering/water-background.js';
 
 // Global state
 let flock;
@@ -24,6 +25,7 @@ let renderer;
 let controlPanel;
 let brushTextures;
 let backgroundImage;
+let waterBackground;
 let lilypadManager;
 let lilypadImages = [];
 let blossomManager;
@@ -257,6 +259,13 @@ window.setup = function() {
     );
     blossomManager.setSizeScale(environmentSizeScale);
 
+    // Initialize water background with mobile detection and static background image
+    waterBackground = new WaterBackground(window, brushTextureImages, {
+        isMobile,
+        staticBackgroundImage: backgroundImage
+    });
+    waterBackground.init(bufferDims.width, bufferDims.height);
+
     // Initialize control panel
     controlPanel = new ControlPanel(params, {
         onAudioFileLoad: async (file) => {
@@ -361,14 +370,15 @@ window.draw = function() {
     // Get audio data
     const audioData = audio.getAudioData();
 
-    // Draw background - watercolor texture
+    // Draw background - animated watercolor with static base layer
     const pg = pixelBuffer.getContext();
 
-    // Draw the background image to fill the buffer
-    if (backgroundImage) {
-        pg.image(backgroundImage, 0, 0, pg.width, pg.height);
+    // Render water background (includes static image + animated particles)
+    if (waterBackground) {
+        waterBackground.update();
+        waterBackground.render(pg);
     } else {
-        // Fallback to solid color if image isn't loaded
+        // Fallback if water background not initialized
         pg.background(242, 240, 235);
     }
 
