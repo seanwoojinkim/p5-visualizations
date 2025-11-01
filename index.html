@@ -3,30 +3,116 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="refresh" content="0; url=/portfolio/">
-    <title>redirecting...</title>
-    <style>
-        body {
-            font-family: 'Courier New', monospace;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            height: 100vh;
-            margin: 0;
-            background: #fff;
-            color: #000;
-        }
-        p {
-            font-size: 11px;
-            text-transform: uppercase;
-            letter-spacing: 0.1em;
-        }
-    </style>
+    <title>visualizations — project index</title>
+    <link rel="stylesheet" href="portfolio/css/style.css">
 </head>
 <body>
-    <p>redirecting to portfolio...</p>
-    <script>
-        window.location.href = '/portfolio/';
-    </script>
+    <div class="container">
+        <nav>
+            <a href="/" class="logo">visualizations</a>
+            <div class="nav-links">
+                <a href="/" class="active">projects</a>
+                <a href="/portfolio/">portfolio</a>
+            </div>
+        </nav>
+
+        <header>
+            <h1>project index</h1>
+            <p class="subtitle">
+                development collection of interactive visualizations, generative systems,
+                and biometric experiments. live demos and technical documentation.
+            </p>
+        </header>
+
+        <div class="grid">
+            <!-- Flocking -->
+            <div class="card">
+                <div class="status">2025</div>
+                <div class="card-number">01 — generative</div>
+                <h2 class="card-title">koi simulation</h2>
+                <p class="card-desc">
+                    organic movement patterns through emergent flocking behavior.
+                    svg rendering with brush textures and audio reactivity.
+                </p>
+                <div class="button-group">
+                    <a href="/flocking/index.html" class="btn">launch</a>
+                    <a href="/flocking/koi-editor.html" class="btn-secondary">editor</a>
+                </div>
+            </div>
+
+            <!-- Coherence -->
+            <div class="card">
+                <div class="status">2025</div>
+                <div class="card-number">02 — biometric</div>
+                <h2 class="card-title">coherence visualization</h2>
+                <p class="card-desc">
+                    two-group boid system visualizing interpersonal physiological coherence.
+                    smooth transitions from repulsion to synchronized movement.
+                </p>
+                <div class="button-group">
+                    <a href="/coherence/index.html" class="btn">launch</a>
+                    <a href="/coherence/index-polar.html" class="btn-secondary">polar h10</a>
+                </div>
+            </div>
+
+            <!-- Calming Clouds -->
+            <div class="card">
+                <div class="status">2025 — in progress</div>
+                <div class="card-number">03 — generative</div>
+                <h2 class="card-title">calming clouds</h2>
+                <p class="card-desc">
+                    procedural cloud system for meditative biofeedback visualization.
+                    multi-scale noise creating slow ambient drift for hrv training sessions.
+                </p>
+                <div class="button-group">
+                    <a href="/clouds/index.html" class="btn">launch</a>
+                    <a href="/clouds/examples/test-noise-engine.html" class="btn-secondary">test</a>
+                </div>
+            </div>
+
+            <!-- Water Background -->
+            <div class="card">
+                <div class="status">2025</div>
+                <div class="card-number">04 — visual</div>
+                <h2 class="card-title">animated water</h2>
+                <p class="card-desc">
+                    painterly water background with gentle movement and mobile optimizations.
+                    designed for calming biofeedback interfaces.
+                </p>
+                <div class="button-group">
+                    <a href="/water-background/index.html" class="btn">launch</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Technical Specifications -->
+        <div class="specs">
+            <div class="specs-title">Technical Specifications</div>
+            <div class="specs-grid">
+                <div class="specs-label">framework</div>
+                <div class="specs-value">p5.js 1.7.0</div>
+
+                <div class="specs-label">rendering</div>
+                <div class="specs-value">canvas 2d, webgl compatible</div>
+
+                <div class="specs-label">architecture</div>
+                <div class="specs-value">es6 modules, component-based</div>
+
+                <div class="specs-label">environment</div>
+                <div class="specs-value">development monorepo</div>
+
+                <div class="specs-label">repository</div>
+                <div class="specs-value"><a href="https://github.com/yourusername/visualizations" style="color: #000; text-decoration: underline;">github</a></div>
+            </div>
+        </div>
+
+        <footer>
+            <span>© 2025 visualizations index</span>
+            <div style="display: flex; gap: 20px;">
+                <a href="/portfolio/">portfolio site</a>
+                <a href="/thoughts/">documentation</a>
+            </div>
+        </footer>
+    </div>
 </body>
 </html>
