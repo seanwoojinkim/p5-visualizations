@@ -1,1 +1,179 @@
+# ============================================
+# Visualizations Monorepo - Git Ignore
+# ============================================
+
+# Vercel
+.vercel/
 .vercel
+
+# ============================================
+# Dependencies & Build
+# ============================================
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json.bak
+
+# Python (hrv-monitor)
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+venv/
+ENV/
+env/
+
+# ============================================
+# Operating System
+# ============================================
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+Desktop.ini
+
+# Linux
+*~
+.directory
+
+# ============================================
+# IDEs & Editors
+# ============================================
+
+# VSCode
+.vscode/
+*.code-workspace
+
+# JetBrains IDEs (WebStorm, PhpStorm, etc.)
+.idea/
+*.iml
+*.iws
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Vim
+[._]*.s[a-v][a-z]
+[._]*.sw[a-p]
+[._]s[a-rt-v][a-z]
+[._]ss[a-gi-z]
+[._]sw[a-p]
+
+# ============================================
+# Development & Testing
+# ============================================
+
+# Test output
+*.test.js
+test-*.mjs
+coverage/
+.nyc_output/
+
+# Logs
+logs/
+*.log
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# ============================================
+# Project-Specific
+# ============================================
+
+# Development documentation (internal)
+# Keep README.md files but exclude detailed phase/review docs
+PHASE*.md
+*CHECKPOINT*.md
+code-review-*.md
+
+# Thoughts & research (internal documentation)
+thoughts/
+flocking/thoughts/
+coherence/thoughts/
+
+# HRV Monitor (Python development environment)
+hrv-monitor/
+
+# Archive/backup files
+*-archive*.png
+*-archive*.jpg
+*.bak
+*.backup
+
+# Binary source files (not needed for web deployment)
+*.blend
+*.blend1
+*.rar
+*.zip
+clouds/Stylized Cloud Generator/
+
+# ============================================
+# Docker
+# ============================================
+
+# Docker files (not needed in git for this project)
+# Uncomment if you want to track Docker configs:
+# Dockerfile*
+# docker-compose*.yml
+# *.sh
+
+# ============================================
+# Claude AI Assistant
+# ============================================
+
+# Local settings (may contain personal preferences)
+.claude/settings.local.json
+
+# Keep the following .claude files:
+# - README.md (usage docs)
+# - agents/*.md (agent definitions)
+# - Other documentation
+
+# ============================================
+# Sensitive Information
+# ============================================
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+.env.development
+.env.production
+
+# Credentials
+credentials*.json
+secrets*.json
+*.pem
+*.key
+*_rsa
+id_rsa*
+id_dsa*
+
+# ============================================
+# Build Outputs (if any)
+# ============================================
+
+dist/
+build/
+out/
+
+# ============================================
+# Optional: Large/Generated Assets
+# ============================================
+
+# Uncomment if you have processed/optimized versions:
+# *-processed.png
+# *-optimized.jpg

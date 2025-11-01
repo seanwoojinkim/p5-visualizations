@@ -1,0 +1,33 @@
+# Development
+hrv-monitor
+node_modules
+thoughts
+
+# Binary assets not needed for web
+clouds/Stylized Cloud Generator.rar
+clouds/Stylized Cloud Generator
+*.blend
+
+# Documentation
+*.md
+!README.md
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test files
+test-*.mjs
+*.test.js
+
+# Claude AI
+.claude
+
+# Docker
+Dockerfile*
+docker-compose.yml
+*.sh
+
+# Git
+.git
+.gitignore
