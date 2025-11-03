@@ -54,8 +54,8 @@ const isSmallScreen = window.innerWidth < 1024;
 
 // Parameters with device-specific defaults
 let params = {
-    pixelScale: isMobile ? 4 : (isSmallScreen ? 2 : 2),  // Mobile: 4 for much smaller buffer (4x fewer pixels)
-    numBoids: isMobile ? 10 : (isSmallScreen ? 50 : 80),  // Mobile: 10 fish for performance
+    pixelScale: isMobile ? 6 : (isSmallScreen ? 2 : 2),  // Mobile: 6 for tiny buffer (extreme performance mode)
+    numBoids: isMobile ? 5 : (isSmallScreen ? 50 : 80),  // Mobile: 5 fish for performance
     maxSpeed: 0.5,
     maxForce: 0.05,  // Reduced from 0.1 for smoother steering (matches Processing standard)
     separationWeight: 0.9,  // Linear inverse (1/d) forces allow higher separation without jerky movement
@@ -65,11 +65,10 @@ let params = {
     audioReactivity: 0.5
 };
 
-// Base size scale to compensate for pixelScale changes
-// For koi: baseSizeScale equals pixelScale to properly compensate for buffer scaling
-// For lilypads/blossoms: baseline is pixelScale=2 (their base sizes were designed for that)
-const baseSizeScale = params.pixelScale;
-const environmentSizeScale = params.pixelScale / 2;  // Baseline: pixelScale=2 → scale=1.0
+// Base size scale - MUST BE CONSTANT for consistent visual size across all pixelScales
+// The renderer handles pixelScale internally; baseSizeScale is for artistic sizing only
+const baseSizeScale = 2.0;  // Fixed at 2.0 for consistent koi visual size
+const environmentSizeScale = 1.0;  // Fixed at 1.0 for consistent environment visual size
 
 // Log device-optimized settings
 const deviceType = isMobile ? 'Mobile' : (isSmallScreen ? 'Tablet' : 'Desktop');
@@ -227,8 +226,8 @@ window.setup = function() {
     renderer = new KoiRenderer(brushTextures);
 
     // Initialize lilypad manager
-    // Create a few lilypads per screen (2-5 depending on screen size, reduced on mobile for performance)
-    const lilypadCount = isMobile ? 2 : (isSmallScreen ? 4 : 5);
+    // Disabled on mobile for performance (Galaxy A32 can't handle them at 8fps)
+    const lilypadCount = isMobile ? 0 : (isSmallScreen ? 4 : 5);
     lilypadManager = new LilypadManager(
         lilypadImages,
         lilypadCount,
@@ -243,9 +242,9 @@ window.setup = function() {
     lilypadManager.setSizeScale(environmentSizeScale);
 
     // Initialize blossom manager
-    // Spawn new blossoms periodically (every 2 seconds at 60fps)
+    // Disabled on mobile for performance (Galaxy A32 can't handle them at 8fps)
     const blossomSpawnRate = 120;
-    const maxBlossoms = isMobile ? 5 : (isSmallScreen ? 12 : 15);
+    const maxBlossoms = isMobile ? 0 : (isSmallScreen ? 12 : 15);
     blossomManager = new BlossomManager(
         blossomImages,
         blossomSpawnRate,
@@ -281,15 +280,8 @@ window.setup = function() {
             flock.width = bufferDims.width;
             flock.height = bufferDims.height;
 
-            // Update size scale for lilypads and blossoms
-            // environmentSizeScale uses pixelScale=2 as baseline (scale / 2)
-            const newEnvironmentSizeScale = scale / 2;
-            if (lilypadManager) {
-                lilypadManager.setSizeScale(newEnvironmentSizeScale);
-            }
-            if (blossomManager) {
-                blossomManager.setSizeScale(newEnvironmentSizeScale);
-            }
+            // Note: Environment size scale is now constant (1.0), not tied to pixelScale
+            // This ensures consistent visual size regardless of pixel scale setting
         },
         onBoidCountChange: (count) => {
             flock.resize(count);
