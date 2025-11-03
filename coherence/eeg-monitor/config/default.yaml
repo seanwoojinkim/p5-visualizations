@@ -20,35 +20,42 @@ muse:
 
 # Signal Processing Configuration
 signal_processing:
-  # Time window for FFT analysis
+  # Basic parameters
+  sample_rate: 256        # Hz - must match Muse 2 hardware
   window_duration: 2.0    # seconds - controls frequency resolution
-  overlap: 0.5            # 50% overlap between windows
+  window_overlap: 0.5     # 50% overlap for Welch's method (0.0-0.99)
 
   # Frequency band definitions (Hz)
-  bands:
-    delta: [0.5, 4]       # Deep sleep
-    theta: [4, 8]         # Meditation, creativity
-    alpha: [8, 13]        # Relaxation, calm focus
-    beta: [12, 30]        # Active thinking, concentration
-    gamma: [30, 50]       # High-level cognition
+  frequency_bands:
+    delta: [0.5, 4]       # Deep sleep, unconscious processes
+    theta: [4, 8]         # Meditation, creativity, memory
+    alpha: [8, 13]        # Relaxation, calm focus, wakeful rest
+    beta: [12, 30]        # Active thinking, concentration, alertness
+    gamma: [30, 50]       # High-level cognition, learning
 
-  # Filtering
+  # Bandpass filter configuration
   bandpass:
-    enabled: true
-    low_cutoff: 0.5       # Hz
-    high_cutoff: 50       # Hz
-    order: 4              # Filter order
+    enabled: true         # Set false to disable bandpass filtering
+    low_cutoff: 0.5       # Hz - removes DC drift
+    high_cutoff: 50       # Hz - removes high-frequency noise
+    order: 4              # Filter order (higher = steeper rolloff)
 
+  # Notch filter configuration (line noise removal)
   notch:
-    enabled: true
-    frequency: 60         # Hz - Line noise (use 50 for Europe)
-    quality_factor: 30
+    enabled: true         # Set false to disable notch filtering
+    frequency: 60         # Hz - Line noise (use 50 for Europe/Asia)
+    quality_factor: 30    # Q factor (higher = narrower notch)
 
-  # Artifact detection
+  # Artifact detection thresholds
   artifacts:
-    enabled: true
-    max_amplitude: 200    # microvolts - flag samples exceeding this
-    min_amplitude: 0.1    # microvolts - flag suspiciously low signals
+    enabled: true         # Set false to disable artifact detection
+    blink_threshold: 100  # microvolts - eye blink detection threshold
+    jaw_threshold: 50     # microvolts - jaw clench variance threshold
+    movement_threshold: 150  # microvolts - movement artifact threshold
+
+  # Performance tuning (advanced)
+  # buffer_size_multiplier: 3  # Buffer size = window_size × multiplier
+  # welch_segment_size: 256    # Segment size for Welch's method (null = auto)
 
 # Protocol Selection and Settings
 protocols:
