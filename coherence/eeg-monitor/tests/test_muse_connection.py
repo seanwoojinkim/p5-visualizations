@@ -28,7 +28,7 @@ from typing import Optional, Dict, List
 import numpy as np
 
 try:
-    from pylsl import StreamInlet, resolve_byprop, TimeoutError
+    from pylsl import StreamInlet, resolve_byprop
 except ImportError:
     print("Error: pylsl not installed")
     print("Run: pip install pylsl")
@@ -117,13 +117,12 @@ class MuseConnectionTest:
         info = self.inlet.info()
         channel_count = info.channel_count()
 
-        expected = len(self.expected_channels)
-
-        if channel_count == expected:
-            self.print_status("✓", f"Channel count correct: {channel_count}")
+        # Muse 2 can have 4 or 5 channels (5th is auxiliary)
+        if channel_count in [4, 5]:
+            self.print_status("✓", f"Channel count: {channel_count} (Muse 2 has 4 EEG + optional AUX)")
             return True
         else:
-            self.print_status("✗", f"Expected {expected} channels, got {channel_count}")
+            self.print_status("✗", f"Expected 4-5 channels, got {channel_count}")
             return False
 
     def test_channel_names(self) -> bool:
@@ -180,8 +179,11 @@ class MuseConnectionTest:
         print(f"Testing data streaming for {duration} seconds...")
         print("(This validates sample rate and connection stability)\n")
 
+        # Get actual channel count from stream
+        channel_count = self.inlet.info().channel_count()
+
         sample_count = 0
-        samples_per_channel: Dict[int, List[float]] = {i: [] for i in range(4)}
+        samples_per_channel: Dict[int, List[float]] = {i: [] for i in range(channel_count)}
         start_time = time.time()
         last_print_time = start_time
 

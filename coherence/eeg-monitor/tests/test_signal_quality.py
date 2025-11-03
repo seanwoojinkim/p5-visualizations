@@ -71,7 +71,21 @@ class SignalQualityTest:
                 return False
 
             self.inlet = StreamInlet(streams[0])
-            self.print_status("✓", "Connected to Muse stream")
+
+            # Get actual channel names from stream
+            info = self.inlet.info()
+            channel_count = info.channel_count()
+            ch = info.desc().child("channels").child("channel")
+
+            actual_channels = []
+            for i in range(channel_count):
+                actual_channels.append(ch.child_value("label"))
+                ch = ch.next_sibling()
+
+            # Only use the 4 main EEG channels (ignore AUX)
+            self.channels = [ch for ch in actual_channels if ch in ['TP9', 'AF7', 'AF8', 'TP10']]
+
+            self.print_status("✓", f"Connected to Muse stream ({len(self.channels)} EEG channels)")
             return True
 
         except Exception as e:
@@ -90,14 +104,25 @@ class SignalQualityTest:
         """
         print(f"Collecting {duration} seconds of data...", end='', flush=True)
 
+        # Get all channel names from stream
+        info = self.inlet.info()
+        channel_count = info.channel_count()
+        ch = info.desc().child("channels").child("channel")
+        all_channels = []
+        for i in range(channel_count):
+            all_channels.append(ch.child_value("label"))
+            ch = ch.next_sibling()
+
         data = {ch: [] for ch in self.channels}
         start_time = time.time()
 
         while time.time() - start_time < duration:
             sample, _ = self.inlet.pull_sample(timeout=1.0)
             if sample:
+                # Only collect data from EEG channels (skip AUX)
                 for i, value in enumerate(sample):
-                    data[self.channels[i]].append(value)
+                    if i < len(all_channels) and all_channels[i] in self.channels:
+                        data[all_channels[i]].append(value)
 
             # Print progress dots
             if int((time.time() - start_time) * 4) % 4 == 0:
@@ -127,6 +152,12 @@ class SignalQualityTest:
         all_good = True
 
         for channel, samples in data.items():
+            # Check if channel has data
+            if len(samples) == 0:
+                self.print_status("✗", f"{channel}: No data received")
+                print("    → Stream may have disconnected")
+                all_good = False
+                continue
             mean = np.mean(np.abs(samples))
             std = np.std(samples)
             min_val = np.min(samples)
