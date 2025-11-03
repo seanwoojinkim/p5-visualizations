@@ -23,15 +23,15 @@ export class WaterBackground {
         };
 
         // Performance-optimized parameters with mobile detection
+        // Mobile: ZERO particles (static background only for performance)
         this.params = {
-            particleCount: this.isMobile ? 30 : 150,  // Minimal particles on mobile
-            numLayers: this.isMobile ? 1 : 2,          // Single layer on mobile
+            particleCount: this.isMobile ? 0 : 150,  // NO particles on mobile
+            numLayers: this.isMobile ? 0 : 2,        // NO animated layers on mobile
             flowSpeed: 0.5,
-            noiseCacheTime: this.isMobile ? 1000 : 500 // Cache noise longer on mobile
+            noiseCacheTime: 500
         };
 
-        console.log(`🌊 Water background: Mobile=${this.isMobile}, Particles=${this.params.particleCount}, Layers=${this.params.numLayers}`);
-        console.log(`   Scale range: ${this.isMobile ? '135-225px' : '150-300px'}`);
+        console.log(`🌊 Water background: Mobile=${this.isMobile}, Particles=${this.params.particleCount}, Layers=${this.params.numLayers} (${this.isMobile ? 'STATIC ONLY' : 'ANIMATED'})`);
     }
 
     /**
@@ -81,20 +81,22 @@ export class WaterBackground {
      * @param {p5.Graphics} pg - Pixel buffer context
      */
     render(pg) {
-        // Draw static painted water background first with gentle pulsing
+        // Draw static painted water background first with gentle pulsing (desktop only)
         if (this.staticBackgroundImage) {
             pg.push();
 
-            // Gentle breathing/pulsing effect (zooms in/out slightly)
-            const time = this.p5.millis() - this.startTime;
-            const pulseSpeed = 0.0003; // Very slow pulsing
-            const pulseAmount = 0.03; // 3% zoom range (1.0 to 1.03)
-            const pulse = 1.0 + Math.sin(time * pulseSpeed) * pulseAmount;
+            // Gentle breathing/pulsing effect (disabled on mobile for performance)
+            if (!this.isMobile) {
+                const time = this.p5.millis() - this.startTime;
+                const pulseSpeed = 0.0003; // Very slow pulsing
+                const pulseAmount = 0.03; // 3% zoom range (1.0 to 1.03)
+                const pulse = 1.0 + Math.sin(time * pulseSpeed) * pulseAmount;
 
-            // Center the scaling so it zooms from center
-            pg.translate(pg.width / 2, pg.height / 2);
-            pg.scale(pulse);
-            pg.translate(-pg.width / 2, -pg.height / 2);
+                // Center the scaling so it zooms from center
+                pg.translate(pg.width / 2, pg.height / 2);
+                pg.scale(pulse);
+                pg.translate(-pg.width / 2, -pg.height / 2);
+            }
 
             pg.image(this.staticBackgroundImage, 0, 0, pg.width, pg.height);
             pg.pop();
