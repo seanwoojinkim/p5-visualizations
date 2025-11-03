@@ -304,6 +304,9 @@ window.setup = function() {
 
     // Set up keyboard controls
     setupKeyboardControls();
+
+    // Set up touch controls for mobile
+    setupTouchControls();
 };
 
 // Set up toggle controls
@@ -360,6 +363,32 @@ function setupKeyboardControls() {
                 break;
         }
     });
+}
+
+// Set up touch controls for mobile
+function setupTouchControls() {
+    let touchStartTime = 0;
+    let touchStartCount = 0;
+
+    document.addEventListener('touchstart', (e) => {
+        if (e.touches.length === 3) {
+            touchStartTime = Date.now();
+            touchStartCount = 3;
+        }
+    }, { passive: true });
+
+    document.addEventListener('touchend', (e) => {
+        // Check if we had 3 fingers at start and the tap was quick
+        if (touchStartCount === 3 && Date.now() - touchStartTime < 300) {
+            debugVectors = !debugVectors;
+            console.log('Debug FPS (three-finger tap):', debugVectors ? 'ON' : 'OFF');
+        }
+
+        // Reset counter when all touches are released
+        if (e.touches.length === 0) {
+            touchStartCount = 0;
+        }
+    }, { passive: true });
 }
 
 // p5.js draw function
