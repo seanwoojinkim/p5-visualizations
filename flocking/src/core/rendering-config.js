@@ -49,5 +49,26 @@ export const RENDERING_CONFIG = {
         defaultSizeScale: 1,      // Default size scale for rendering
         eyeRadiusBase: 0.5,       // Base eye radius
         eyeRadiusOuter: 0.7       // Outer eye radius (white part)
+    },
+
+    // Texture rendering (brush strokes, paper texture)
+    // Default: disabled on mobile for performance, enabled on desktop
+    textures: {
+        enabled: !(window.innerWidth < 768 || /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)),
+        paper: {
+            enabled: true
+        },
+        body: {
+            enabled: true
+        },
+        tail: {
+            enabled: true
+        },
+        fin: {
+            enabled: true
+        },
+        spot: {
+            enabled: false  // Spot textures disabled by default (expensive)
+        }
     }
 };

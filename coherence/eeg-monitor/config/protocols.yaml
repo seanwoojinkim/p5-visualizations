@@ -1,0 +1,213 @@
+# Neurofeedback Protocol Configurations
+# Defines parameters and thresholds for all supported protocols
+
+protocols:
+  # Protocol 1: Alpha Enhancement
+  # Most basic and well-validated neurofeedback protocol
+  # Goal: Increase alpha power for relaxation and meditation
+  alpha_enhancement:
+    name: "Alpha Enhancement"
+    description: "Increase alpha waves (8-13 Hz) for relaxation and meditation training"
+
+    # Research basis
+    research_notes: |
+      Alpha enhancement is the most widely studied neurofeedback protocol.
+      Higher alpha is associated with relaxed alertness, reduced anxiety,
+      and meditative states. Typically trained with eyes closed.
+
+    # Frequency bands used
+    frequency_bands:
+      alpha: [8, 13]
+
+    # Protocol parameters
+    parameters:
+      baseline_window: 120        # seconds - duration for baseline calculation
+      smoothing_factor: 0.7       # 0-1 - temporal smoothing of scores
+      use_relative_power: true    # Score relative to baseline vs absolute
+      eyes_state: "closed"        # "closed" or "open" - recommended state
+
+    # Scoring thresholds (0-100 scale)
+    thresholds:
+      low: 30           # Below this = needs improvement
+      medium: 50        # Moderate performance
+      good: 70          # Good performance
+      excellent: 85     # Excellent performance
+
+    # Channels to prioritize (null = use all)
+    preferred_channels: null  # or ["AF7", "AF8"] for frontal focus
+
+  # Protocol 2: Theta/Beta Ratio Training
+  # Evidence-based protocol for attention and focus
+  # CRITICAL: Lower ratio = better (inverse scoring)
+  theta_beta_ratio:
+    name: "Theta/Beta Ratio"
+    description: "Reduce theta/beta ratio for improved attention and focus (ADHD protocol)"
+
+    research_notes: |
+      Theta/beta ratio training is the most validated protocol for ADHD,
+      with 67+ published studies. High theta/beta ratio (>2.0) correlates
+      with attention difficulties. Training reduces ratio by increasing
+      beta and/or decreasing theta. Uses frontal channels (AF7, AF8).
+
+      IMPORTANT: Lower ratio is better - inverse scoring!
+
+    frequency_bands:
+      theta: [4, 8]
+      beta: [12, 30]
+
+    parameters:
+      baseline_window: 120
+      smoothing_factor: 0.8       # More smoothing for stability
+      target_ratio: 1.5           # Ideal ratio (lower = better focus)
+      inhibit_high_beta: false    # Optionally inhibit >20 Hz to prevent tension
+      eyes_state: "open"          # Usually trained eyes open
+
+    # INVERSE THRESHOLDS: Lower ratio = better score
+    thresholds:
+      excellent: 1.5    # Ratio <= 1.5 = excellent focus
+      good: 2.0         # Ratio <= 2.0 = good focus
+      medium: 2.5       # Ratio <= 2.5 = moderate focus
+      low: 3.0          # Ratio > 3.0 = needs improvement
+
+    preferred_channels: ["AF7", "AF8"]  # Frontal electrodes
+
+    # Additional ratio calculation options
+    calculation:
+      method: "mean"    # "mean" or "peak" - how to combine theta/beta
+      normalize: true   # Normalize by total power
+
+  # Protocol 3: Alpha Asymmetry (Frontal)
+  # Davidson's approach for mood regulation and emotional balance
+  alpha_asymmetry:
+    name: "Alpha Asymmetry"
+    description: "Balance left/right hemisphere alpha for mood regulation"
+
+    research_notes: |
+      Based on Richard Davidson's frontal alpha asymmetry model.
+      Left frontal activation (less left alpha) correlates with approach
+      motivation and positive affect. Right frontal activation (less right
+      alpha) correlates with withdrawal and negative affect.
+
+      Calculation: log(right_alpha) - log(left_alpha)
+      Positive = right dominance (withdrawal)
+      Negative = left dominance (approach)
+      Goal: Balance close to zero or slight left dominance
+
+    frequency_bands:
+      alpha: [8, 13]
+
+    parameters:
+      baseline_window: 120
+      smoothing_factor: 0.6
+      target_asymmetry: -0.05    # Slight left dominance (approach)
+      balance_tolerance: 0.1     # Within ±0.1 is considered balanced
+      eyes_state: "closed"       # Typically eyes closed
+
+    # Scoring based on distance from balanced state
+    thresholds:
+      excellent: 0.1    # |asymmetry| <= 0.1
+      good: 0.2         # |asymmetry| <= 0.2
+      medium: 0.3       # |asymmetry| <= 0.3
+      low: 0.5          # |asymmetry| > 0.5
+
+    # Channel mapping (Muse 2 specific)
+    hemisphere_mapping:
+      left: "AF7"       # Left frontal
+      right: "AF8"      # Right frontal
+
+    calculation:
+      method: "logarithmic"  # log(R) - log(L) per Davidson
+
+  # Protocol 4: Theta Enhancement
+  # For deep meditation, creativity, and hypnagogic states
+  theta_enhancement:
+    name: "Theta Enhancement"
+    description: "Increase theta waves (4-8 Hz) for deep meditation and creativity"
+
+    research_notes: |
+      Theta enhancement promotes deep meditative states, creativity,
+      and access to hypnagogic imagery. Associated with REM sleep,
+      creative problem solving, and integrative experiences.
+      Advanced protocol - requires meditation experience.
+
+    frequency_bands:
+      theta: [4, 8]
+
+    parameters:
+      baseline_window: 120
+      smoothing_factor: 0.7
+      use_relative_power: true
+      eyes_state: "closed"
+
+      # Theta can indicate drowsiness - add safeguards
+      suppress_if_drowsy: true    # Detect drowsiness via delta
+      delta_threshold: 50         # Suppress if delta > this
+
+    thresholds:
+      low: 30
+      medium: 50
+      good: 70
+      excellent: 85
+
+    preferred_channels: null
+
+  # Protocol 5: Beta Enhancement (SMR)
+  # Sensorimotor rhythm training for calm focus and performance
+  beta_enhancement:
+    name: "Beta Enhancement"
+    description: "Increase beta waves (12-30 Hz) for alertness and active concentration"
+
+    research_notes: |
+      Beta training enhances alertness, active thinking, and concentration.
+      Can use full beta (12-30 Hz) or SMR (12-15 Hz) for relaxed focus.
+      Warning: Excessive high beta (>20 Hz) may correlate with anxiety.
+
+    frequency_bands:
+      beta: [12, 30]
+
+    parameters:
+      baseline_window: 120
+      smoothing_factor: 0.7
+      use_relative_power: true
+      eyes_state: "open"
+
+      # Prevent anxiety from excessive high beta
+      use_smr_range: false        # If true, use 12-15 Hz instead of 12-30 Hz
+      smr_range: [12, 15]
+      high_beta_threshold: 80     # Warn if high beta (20-30 Hz) exceeds this
+
+    thresholds:
+      low: 30
+      medium: 50
+      good: 70
+      excellent: 85
+
+    preferred_channels: null
+
+    # Optional: Separate low/high beta monitoring
+    monitoring:
+      track_low_beta: true    # 12-20 Hz (focus)
+      track_high_beta: true   # 20-30 Hz (anxiety marker)
+
+# Global Protocol Settings
+global:
+  # Default scoring parameters applied to all protocols
+  score_range: [0, 100]
+
+  # Outlier handling
+  outlier_rejection:
+    enabled: true
+    method: "iqr"         # "iqr" or "zscore"
+    threshold: 3.0        # IQR multiplier or z-score cutoff
+
+  # Temporal smoothing (applied before protocol calculation)
+  temporal_filter:
+    enabled: true
+    method: "exponential"  # "exponential" or "moving_average"
+    window_size: 5        # samples for moving average
+
+  # Feedback display options
+  feedback:
+    update_rate: 1.0      # Hz - how often to send updates
+    include_trends: true  # Include derivative (improving/declining)
+    trend_window: 10      # seconds for trend calculation

@@ -1,0 +1,104 @@
+# EEG Neurofeedback Monitor Configuration
+# Default configuration for Muse 2 headset integration
+
+# Muse 2 Headset Connection Settings
+muse:
+  # LSL stream discovery settings
+  stream_type: "EEG"
+  connection_timeout: 10  # seconds to wait for stream discovery
+  reconnect_delay: 5      # seconds to wait before reconnect attempt
+  max_reconnect_attempts: 5
+
+  # Expected hardware parameters
+  sample_rate: 256        # Hz - Muse 2 nominal sample rate
+  channel_count: 4        # TP9, AF7, AF8, TP10
+  channel_names:
+    - "TP9"   # Left ear
+    - "AF7"   # Left forehead
+    - "AF8"   # Right forehead
+    - "TP10"  # Right ear
+
+# Signal Processing Configuration
+signal_processing:
+  # Time window for FFT analysis
+  window_duration: 2.0    # seconds - controls frequency resolution
+  overlap: 0.5            # 50% overlap between windows
+
+  # Frequency band definitions (Hz)
+  bands:
+    delta: [0.5, 4]       # Deep sleep
+    theta: [4, 8]         # Meditation, creativity
+    alpha: [8, 13]        # Relaxation, calm focus
+    beta: [12, 30]        # Active thinking, concentration
+    gamma: [30, 50]       # High-level cognition
+
+  # Filtering
+  bandpass:
+    enabled: true
+    low_cutoff: 0.5       # Hz
+    high_cutoff: 50       # Hz
+    order: 4              # Filter order
+
+  notch:
+    enabled: true
+    frequency: 60         # Hz - Line noise (use 50 for Europe)
+    quality_factor: 30
+
+  # Artifact detection
+  artifacts:
+    enabled: true
+    max_amplitude: 200    # microvolts - flag samples exceeding this
+    min_amplitude: 0.1    # microvolts - flag suspiciously low signals
+
+# Protocol Selection and Settings
+protocols:
+  # Default protocol to use on startup
+  default: "alpha_enhancement"
+
+  # Update rate for metric calculation
+  update_interval: 1.0    # seconds
+
+  # Baseline calibration
+  baseline:
+    enabled: false        # Set true to require baseline before training
+    duration: 60          # seconds of eyes-closed rest
+    auto_update: false    # Continuously update baseline during training
+
+# WebSocket Server Configuration
+websocket:
+  host: "0.0.0.0"        # Bind to all interfaces
+  port: 8766             # Different from HRV monitor (8765)
+
+  # CORS settings
+  cors_origins:
+    - "http://localhost:3000"
+    - "http://localhost:5500"
+    - "http://127.0.0.1:5500"
+
+  # Rate limiting and security
+  max_clients: 10
+  max_message_size: 1024  # bytes
+  max_messages_per_second: 10
+
+  # Message streaming options
+  stream_band_powers: true      # Send raw band powers
+  stream_protocol_metrics: true # Send protocol-specific metrics
+  stream_raw_waveform: false    # Send raw EEG (high bandwidth!)
+
+# Logging Configuration
+logging:
+  level: "INFO"          # DEBUG, INFO, WARNING, ERROR
+  console: true
+  file: "logs/eeg_monitor.log"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+
+  # Log rotation
+  max_file_size: 10485760  # bytes (10MB)
+  backup_count: 5
+
+# Session Recording (for later phases)
+recording:
+  enabled: false
+  directory: "sessions"
+  format: "hdf5"         # or "csv"
+  include_raw_eeg: false

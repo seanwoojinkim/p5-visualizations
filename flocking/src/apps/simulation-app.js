@@ -54,8 +54,8 @@ const isSmallScreen = window.innerWidth < 1024;
 
 // Parameters with device-specific defaults
 let params = {
-    pixelScale: isMobile ? 2 : (isSmallScreen ? 2 : 2),  // Changed from 4 to 2 for desktop
-    numBoids: isMobile ? 20 : (isSmallScreen ? 50 : 80),
+    pixelScale: isMobile ? 4 : (isSmallScreen ? 2 : 2),  // Mobile: 4 for much smaller buffer (4x fewer pixels)
+    numBoids: isMobile ? 10 : (isSmallScreen ? 50 : 80),  // Mobile: 10 fish for performance
     maxSpeed: 0.5,
     maxForce: 0.05,  // Reduced from 0.1 for smoother steering (matches Processing standard)
     separationWeight: 0.9,  // Linear inverse (1/d) forces allow higher separation without jerky movement
@@ -227,8 +227,8 @@ window.setup = function() {
     renderer = new KoiRenderer(brushTextures);
 
     // Initialize lilypad manager
-    // Create a few lilypads per screen (3-5 depending on screen size)
-    const lilypadCount = isMobile ? 3 : (isSmallScreen ? 4 : 5);
+    // Create a few lilypads per screen (2-5 depending on screen size, reduced on mobile for performance)
+    const lilypadCount = isMobile ? 2 : (isSmallScreen ? 4 : 5);
     lilypadManager = new LilypadManager(
         lilypadImages,
         lilypadCount,
@@ -245,7 +245,7 @@ window.setup = function() {
     // Initialize blossom manager
     // Spawn new blossoms periodically (every 2 seconds at 60fps)
     const blossomSpawnRate = 120;
-    const maxBlossoms = isMobile ? 10 : (isSmallScreen ? 12 : 15);
+    const maxBlossoms = isMobile ? 5 : (isSmallScreen ? 12 : 15);
     blossomManager = new BlossomManager(
         blossomImages,
         blossomSpawnRate,
