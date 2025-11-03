@@ -1,6 +1,11 @@
 """
 Signal Processor for EEG Data
 Implements FFT-based spectral analysis with robust filtering and artifact detection
+
+Phase 7 Enhancements:
+- Advanced artifact rejection via ArtifactRejector
+- Adaptive filtering (line noise + DC drift) via AdaptiveFilter
+- Comprehensive signal quality assessment via SignalQualityAssessor
 """
 
 import numpy as np
@@ -10,6 +15,11 @@ from collections import deque
 from typing import Dict, List, Optional, Tuple
 import logging
 import time
+
+# Phase 7: Import advanced processing components
+from artifact_rejector import ArtifactRejector
+from adaptive_filter import AdaptiveFilter
+from signal_quality import SignalQualityAssessor
 
 
 logger = logging.getLogger(__name__)
@@ -129,8 +139,36 @@ class SignalProcessor:
         # Design filters
         self._design_filters()
 
-        logger.info(f"SignalProcessor initialized: {self.sample_rate} Hz, "
-                   f"{self.window_duration}s window, {len(self.bands)} bands")
+        # Phase 7: Initialize advanced processing components
+        self.use_advanced_processing = config.get('use_advanced_processing', True)
+
+        if self.use_advanced_processing:
+            # Artifact rejection
+            artifact_config = config.get('artifacts', {})
+            artifact_config['sample_rate'] = self.sample_rate
+            self.artifact_rejector = ArtifactRejector(artifact_config)
+
+            # Adaptive filtering
+            adaptive_config = config.get('adaptive_filtering', {})
+            adaptive_config['sample_rate'] = self.sample_rate
+            self.adaptive_filter = AdaptiveFilter(adaptive_config)
+
+            # Signal quality assessment
+            quality_config = config.get('quality_assessment', {})
+            quality_config['sample_rate'] = self.sample_rate
+            self.quality_assessor = SignalQualityAssessor(quality_config)
+
+            logger.info(f"SignalProcessor initialized with advanced processing: "
+                       f"{self.sample_rate} Hz, {self.window_duration}s window, "
+                       f"{len(self.bands)} bands")
+        else:
+            self.artifact_rejector = None
+            self.adaptive_filter = None
+            self.quality_assessor = None
+
+            logger.info(f"SignalProcessor initialized (basic mode): "
+                       f"{self.sample_rate} Hz, {self.window_duration}s window, "
+                       f"{len(self.bands)} bands")
 
     def _validate_config(self, config: Dict) -> None:
         """
@@ -203,6 +241,8 @@ class SignalProcessor:
         """
         Add new EEG samples to a channel's buffer.
 
+        Phase 7: Applies adaptive filtering (notch + DC removal) before buffering.
+
         Validates channel name and sample values before adding.
         Maintains timestamps for each sample for potential future use.
 
@@ -236,6 +276,19 @@ class SignalProcessor:
             logger.warning(f"Channel {channel}: Dropping {np.sum(~np.isfinite(samples_array))} "
                           f"invalid samples (inf/nan)")
             samples_array = samples_array[np.isfinite(samples_array)]
+
+        # Phase 7: Apply adaptive filtering if enabled
+        if self.use_advanced_processing and self.adaptive_filter is not None:
+            try:
+                # Apply adaptive notch filter (line noise removal)
+                samples_array = self.adaptive_filter.apply_adaptive_notch(samples_array)
+
+                # Apply DC drift removal
+                samples_array = self.adaptive_filter.remove_dc_drift(samples_array)
+
+            except Exception as e:
+                logger.error(f"Error applying adaptive filter to {channel}: {e}")
+                # Continue with unfiltered samples on error
 
         # Add to buffer
         now = time.time()
@@ -324,8 +377,33 @@ class SignalProcessor:
                 ])
                 averaged_powers[band_name] = float(avg_power)
 
-            # Detect artifacts (use raw data, not filtered)
-            artifacts = self.detect_artifacts(all_channel_data)
+            # Phase 7: Advanced artifact detection and quality assessment
+            if self.use_advanced_processing:
+                # Use advanced artifact rejector
+                if self.artifact_rejector is not None:
+                    artifacts = self.artifact_rejector.detect_artifacts(all_channel_data)
+                else:
+                    # Fallback to basic detection
+                    artifacts = self.detect_artifacts(all_channel_data)
+
+                # Calculate signal quality
+                if self.quality_assessor is not None:
+                    # Prepare band_powers dict for quality assessment
+                    band_powers_for_quality = {
+                        **averaged_powers,
+                        'channels': channel_results
+                    }
+                    signal_quality = self.quality_assessor.assess_quality(
+                        all_channel_data,
+                        band_powers_for_quality,
+                        artifacts
+                    )
+                else:
+                    signal_quality = None
+            else:
+                # Basic mode: use existing artifact detection
+                artifacts = self.detect_artifacts(all_channel_data)
+                signal_quality = None
 
             # Compile results
             result = {
@@ -334,6 +412,17 @@ class SignalProcessor:
                 'artifacts': artifacts,
                 'timestamp': time.time()
             }
+
+            # Add signal quality if available
+            if signal_quality is not None:
+                result['signal_quality'] = signal_quality
+
+            # Add clean_data flag from artifact rejector
+            if 'clean_data' in artifacts:
+                result['clean_data'] = artifacts['clean_data']
+            else:
+                # Fallback: check basic artifact detection
+                result['clean_data'] = artifacts.get('signal_quality', 'good') in ['good', 'fair']
 
             return result
 

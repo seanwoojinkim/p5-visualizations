@@ -25,6 +25,9 @@ signal_processing:
   window_duration: 2.0    # seconds - controls frequency resolution
   window_overlap: 0.5     # 50% overlap for Welch's method (0.0-0.99)
 
+  # Phase 7: Enable advanced processing (artifact rejection, adaptive filtering, quality assessment)
+  use_advanced_processing: true
+
   # Frequency band definitions (Hz)
   frequency_bands:
     delta: [0.5, 4]       # Deep sleep, unconscious processes
@@ -33,25 +36,51 @@ signal_processing:
     beta: [12, 30]        # Active thinking, concentration, alertness
     gamma: [30, 50]       # High-level cognition, learning
 
-  # Bandpass filter configuration
+  # Bandpass filter configuration (basic, superseded by adaptive filtering)
   bandpass:
     enabled: true         # Set false to disable bandpass filtering
     low_cutoff: 0.5       # Hz - removes DC drift
     high_cutoff: 50       # Hz - removes high-frequency noise
     order: 4              # Filter order (higher = steeper rolloff)
 
-  # Notch filter configuration (line noise removal)
+  # Notch filter configuration (basic, superseded by adaptive filtering)
   notch:
     enabled: true         # Set false to disable notch filtering
     frequency: 60         # Hz - Line noise (use 50 for Europe/Asia)
     quality_factor: 30    # Q factor (higher = narrower notch)
 
-  # Artifact detection thresholds
+  # Phase 7: Advanced Artifact Rejection
   artifacts:
     enabled: true         # Set false to disable artifact detection
-    blink_threshold: 100  # microvolts - eye blink detection threshold
-    jaw_threshold: 50     # microvolts - jaw clench variance threshold
-    movement_threshold: 150  # microvolts - movement artifact threshold
+    blink_threshold: 150  # microvolts - eye blink detection threshold (increased from 100)
+    movement_threshold: 100  # microvolts - movement artifact threshold
+    jaw_freq_range: [30, 100]  # Hz - frequency range for jaw muscle activity
+    jaw_power_threshold: 2.0  # Power ratio threshold for jaw clenches
+    pop_gradient_threshold: 50  # µV/sample - electrode pop detection
+    eye_movement_correlation: -0.5  # Correlation threshold for eye movements
+    rejection_threshold: 0.15  # Maximum acceptable artifact ratio (15%)
+
+  # Phase 7: Adaptive Filtering (auto-adjusts to signal characteristics)
+  adaptive_filtering:
+    enabled: true         # Enable adaptive filtering
+    auto_detect_line_noise: true  # Auto-detect 50 vs 60 Hz line noise
+    force_line_freq: null  # Force specific frequency (Hz) or null for auto
+    notch_q_factor: 30    # Quality factor for adaptive notch filter
+    dc_cutoff: 0.5        # Hz - high-pass cutoff for DC drift removal
+    dc_order: 2           # Filter order for DC removal
+    detection_threshold: 1.5  # Power ratio to detect line noise
+    update_interval: 2560  # Samples between detection updates (~10s at 256 Hz)
+
+  # Phase 7: Signal Quality Assessment
+  quality_assessment:
+    enabled: true         # Enable quality assessment
+    history_size: 60      # Number of measurements to track (~1 minute)
+    snr_weight: 0.3       # Weight for SNR in composite score
+    impedance_weight: 0.3  # Weight for impedance in composite score
+    purity_weight: 0.2    # Weight for spectral purity
+    stability_weight: 0.2  # Weight for temporal stability
+    min_amplitude: 5.0    # Minimum expected amplitude (µV)
+    max_amplitude: 100.0  # Maximum expected amplitude (µV)
 
   # Performance tuning (advanced)
   # buffer_size_multiplier: 3  # Buffer size = window_size × multiplier

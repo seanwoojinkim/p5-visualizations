@@ -290,6 +290,8 @@ class IntegrationManager:
     async def _calculate_and_broadcast(self) -> None:
         """
         Calculate band powers and protocol metrics, then broadcast to clients.
+
+        Phase 7: Enhanced with signal quality assessment and selective protocol calculation.
         """
         try:
             # Calculate band powers
@@ -303,30 +305,64 @@ class IntegrationManager:
             # Broadcast raw EEG data
             await self.websocket_server.broadcast_eeg_update(band_powers)
 
-            # Check signal quality
+            # Phase 7: Enhanced signal quality handling
             artifacts = band_powers.get('artifacts', {})
-            signal_quality = artifacts.get('signal_quality', 'unknown')
+            clean_data = band_powers.get('clean_data', True)
 
-            if signal_quality == 'poor':
-                logger.warning("Poor signal quality detected")
-                # Still calculate metrics but flag quality
+            # Get signal quality assessment if available
+            signal_quality_assessment = band_powers.get('signal_quality', {})
+            quality_level = signal_quality_assessment.get('quality_level', 'unknown')
+            quality_score = signal_quality_assessment.get('overall_score', 0.0)
 
-            # Handle baseline calibration
+            # Legacy compatibility: check basic artifact signal_quality
+            if quality_level == 'unknown':
+                quality_level = artifacts.get('signal_quality', 'unknown')
+
+            # Log quality issues
+            if quality_level == 'poor' or quality_score < 40:
+                logger.warning(f"Poor signal quality detected: level={quality_level}, "
+                             f"score={quality_score:.1f}, clean_data={clean_data}")
+
+                # Log recommendations if available
+                recommendations = signal_quality_assessment.get('recommendations', [])
+                if recommendations:
+                    logger.info(f"Quality recommendations: {'; '.join(recommendations)}")
+
+            # Handle baseline calibration (skip if quality is too poor)
             if self.baseline_state == 'calibrating':
-                await self._handle_baseline_sample(band_powers)
+                if clean_data and quality_score >= 30:
+                    await self._handle_baseline_sample(band_powers)
+                else:
+                    logger.debug("Skipping baseline sample due to poor quality")
 
-            # Calculate protocol metrics
-            metrics = self.protocol_calculator.calculate(band_powers)
+            # Calculate protocol metrics (skip if data is not clean)
+            if clean_data and quality_score >= 30:
+                metrics = self.protocol_calculator.calculate(band_powers)
 
-            # Add signal quality to metrics
-            metrics['signal_quality'] = signal_quality
+                # Add signal quality information to metrics
+                metrics['signal_quality'] = quality_level
+                metrics['quality_score'] = quality_score
+                metrics['clean_data'] = clean_data
 
-            # Broadcast protocol metrics
-            await self.websocket_server.broadcast_coherence(metrics)
+                # Broadcast protocol metrics
+                await self.websocket_server.broadcast_coherence(metrics)
 
-            logger.debug(f"Metrics: score={metrics['score']:.1f}, "
-                        f"level={metrics['feedback_level']}, "
-                        f"quality={signal_quality}")
+                logger.debug(f"Metrics: score={metrics['score']:.1f}, "
+                           f"level={metrics['feedback_level']}, "
+                           f"quality={quality_level}/{quality_score:.0f}")
+            else:
+                logger.debug(f"Skipping protocol calculation: clean_data={clean_data}, "
+                           f"quality_score={quality_score:.1f}")
+
+                # Broadcast quality warning to clients
+                await self.websocket_server.broadcast_coherence({
+                    'score': 0,
+                    'feedback_level': 'poor',
+                    'signal_quality': quality_level,
+                    'quality_score': quality_score,
+                    'clean_data': False,
+                    'message': 'Signal quality too poor for reliable metrics'
+                })
 
         except Exception as e:
             logger.error(f"Error calculating and broadcasting: {e}", exc_info=True)
