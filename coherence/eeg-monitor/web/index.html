@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EEG Neurofeedback Monitor</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="header-content">
+            <h1 class="header-title">EEG Neurofeedback Monitor</h1>
+            <div class="connection-status-bar">
+                <div class="status-item" id="muse-status">
+                    <div class="status-indicator" id="muse-indicator"></div>
+                    <span id="muse-status-text">Muse: Disconnected</span>
+                </div>
+                <div class="status-item" id="websocket-status">
+                    <div class="status-indicator" id="websocket-indicator"></div>
+                    <span id="websocket-status-text">WebSocket: Disconnected</span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <div class="main-container">
+
+        <!-- Left Panel: Controls -->
+        <aside class="control-panel">
+
+            <!-- Protocol Selection -->
+            <div class="card">
+                <h2 class="card-title">Protocol Selection</h2>
+                <div class="control-group">
+                    <select id="protocol-selector" class="select-input">
+                        <option value="alpha_enhancement">Alpha Enhancement</option>
+                        <option value="theta_beta_ratio">Theta/Beta Ratio</option>
+                        <option value="alpha_asymmetry">Alpha Asymmetry</option>
+                        <option value="theta_enhancement">Theta Enhancement</option>
+                        <option value="beta_enhancement">Beta Enhancement</option>
+                    </select>
+                </div>
+                <div class="protocol-info">
+                    <h3 id="protocol-name" class="protocol-name">Alpha Enhancement</h3>
+                    <p id="protocol-description" class="protocol-description">
+                        Promotes relaxation and meditation by increasing alpha waves (8-13 Hz)
+                    </p>
+                    <div class="protocol-details">
+                        <div class="detail-item">
+                            <span class="detail-label">Direction:</span>
+                            <span id="protocol-direction" class="detail-value">Higher is better</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Instructions:</span>
+                            <span id="protocol-instructions" class="detail-value">
+                                Close your eyes and relax
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Baseline Calibration -->
+            <div class="card">
+                <h2 class="card-title">Baseline Calibration</h2>
+                <div class="baseline-status">
+                    <div class="baseline-indicator" id="baseline-indicator">
+                        <span id="baseline-status-text">Not calibrated</span>
+                    </div>
+                </div>
+                <div class="control-group">
+                    <div class="input-group">
+                        <label for="baseline-duration">Duration (seconds):</label>
+                        <input type="number" id="baseline-duration"
+                               class="number-input"
+                               value="60" min="30" max="300" step="10">
+                    </div>
+                    <button id="start-baseline-btn" class="btn btn-primary">
+                        Start Calibration
+                    </button>
+                    <button id="finish-baseline-btn" class="btn btn-secondary" disabled>
+                        Finish Calibration
+                    </button>
+                </div>
+                <div class="progress-container" id="baseline-progress-container" style="display: none;">
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="baseline-progress-fill"></div>
+                    </div>
+                    <div class="progress-text">
+                        <span id="baseline-progress-text">0%</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Signal Quality -->
+            <div class="card">
+                <h2 class="card-title">Signal Quality</h2>
+                <div class="channel-indicators">
+                    <div class="channel-item" data-channel="TP9">
+                        <span class="channel-label">TP9</span>
+                        <div class="quality-indicator" id="quality-TP9"></div>
+                        <span class="quality-text" id="quality-text-TP9">Unknown</span>
+                    </div>
+                    <div class="channel-item" data-channel="AF7">
+                        <span class="channel-label">AF7</span>
+                        <div class="quality-indicator" id="quality-AF7"></div>
+                        <span class="quality-text" id="quality-text-AF7">Unknown</span>
+                    </div>
+                    <div class="channel-item" data-channel="AF8">
+                        <span class="channel-label">AF8</span>
+                        <div class="quality-indicator" id="quality-AF8"></div>
+                        <span class="quality-text" id="quality-text-AF8">Unknown</span>
+                    </div>
+                    <div class="channel-item" data-channel="TP10">
+                        <span class="channel-label">TP10</span>
+                        <div class="quality-indicator" id="quality-TP10"></div>
+                        <span class="quality-text" id="quality-text-TP10">Unknown</span>
+                    </div>
+                </div>
+            </div>
+
+        </aside>
+
+        <!-- Center Panel: Main Visualizations -->
+        <main class="visualization-panel">
+
+            <!-- Neurofeedback Score -->
+            <div class="card score-card">
+                <h2 class="card-title">Neurofeedback Score</h2>
+                <div class="score-container">
+                    <canvas id="score-gauge" width="300" height="300"></canvas>
+                    <div class="score-overlay">
+                        <div class="score-value" id="score-value">--</div>
+                        <div class="score-level" id="score-level">No Data</div>
+                        <div class="score-direction" id="score-direction"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Band Power Visualization -->
+            <div class="card">
+                <h2 class="card-title">EEG Band Powers</h2>
+                <div class="band-powers-container">
+                    <div class="band-item">
+                        <div class="band-header">
+                            <span class="band-name">Delta (0.5-4 Hz)</span>
+                            <span class="band-value" id="band-value-delta">0.0</span>
+                        </div>
+                        <div class="band-bar-container">
+                            <div class="band-bar band-delta" id="band-bar-delta"></div>
+                        </div>
+                    </div>
+                    <div class="band-item">
+                        <div class="band-header">
+                            <span class="band-name">Theta (4-8 Hz)</span>
+                            <span class="band-value" id="band-value-theta">0.0</span>
+                        </div>
+                        <div class="band-bar-container">
+                            <div class="band-bar band-theta" id="band-bar-theta"></div>
+                        </div>
+                    </div>
+                    <div class="band-item">
+                        <div class="band-header">
+                            <span class="band-name">Alpha (8-13 Hz)</span>
+                            <span class="band-value" id="band-value-alpha">0.0</span>
+                        </div>
+                        <div class="band-bar-container">
+                            <div class="band-bar band-alpha" id="band-bar-alpha"></div>
+                        </div>
+                    </div>
+                    <div class="band-item">
+                        <div class="band-header">
+                            <span class="band-name">Beta (12-30 Hz)</span>
+                            <span class="band-value" id="band-value-beta">0.0</span>
+                        </div>
+                        <div class="band-bar-container">
+                            <div class="band-bar band-beta" id="band-bar-beta"></div>
+                        </div>
+                    </div>
+                    <div class="band-item">
+                        <div class="band-header">
+                            <span class="band-name">Gamma (30-50 Hz)</span>
+                            <span class="band-value" id="band-value-gamma">0.0</span>
+                        </div>
+                        <div class="band-bar-container">
+                            <div class="band-bar band-gamma" id="band-bar-gamma"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- EEG Waveform (Optional) -->
+            <div class="card">
+                <h2 class="card-title">Real-Time EEG Waveform</h2>
+                <div class="waveform-container">
+                    <canvas id="waveform-canvas" width="800" height="200"></canvas>
+                </div>
+            </div>
+
+        </main>
+
+        <!-- Right Panel: Protocol Details -->
+        <aside class="details-panel">
+
+            <!-- Protocol Metrics -->
+            <div class="card">
+                <h2 class="card-title">Protocol Details</h2>
+                <div class="metrics-container" id="protocol-metrics">
+                    <div class="metric-item">
+                        <span class="metric-label">Current Score:</span>
+                        <span class="metric-value" id="detail-score">--</span>
+                    </div>
+                    <div class="metric-item">
+                        <span class="metric-label">Feedback Level:</span>
+                        <span class="metric-value" id="detail-level">--</span>
+                    </div>
+                    <div class="metric-item">
+                        <span class="metric-label">Direction:</span>
+                        <span class="metric-value" id="detail-direction">--</span>
+                    </div>
+                    <!-- Additional protocol-specific details will be inserted here -->
+                    <div id="additional-details"></div>
+                </div>
+            </div>
+
+            <!-- Session Info -->
+            <div class="card">
+                <h2 class="card-title">Session Information</h2>
+                <div class="session-info">
+                    <div class="info-item">
+                        <span class="info-label">Device:</span>
+                        <span class="info-value" id="device-name">Not connected</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Active Protocol:</span>
+                        <span class="info-value" id="active-protocol">None</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Baseline Status:</span>
+                        <span class="info-value" id="baseline-info">Not calibrated</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Session Duration:</span>
+                        <span class="info-value" id="session-duration">00:00</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- System Status -->
+            <div class="card">
+                <h2 class="card-title">System Status</h2>
+                <div class="system-status">
+                    <div class="status-row">
+                        <span class="status-label">WebSocket:</span>
+                        <span class="status-value" id="ws-status">Disconnected</span>
+                    </div>
+                    <div class="status-row">
+                        <span class="status-label">Data Rate:</span>
+                        <span class="status-value" id="data-rate">0 Hz</span>
+                    </div>
+                    <div class="status-row">
+                        <span class="status-label">Buffer Status:</span>
+                        <span class="status-value" id="buffer-status">Unknown</span>
+                    </div>
+                </div>
+            </div>
+
+        </aside>
+
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="footer-content">
+            <span>EEG Neurofeedback Monitor v1.0</span>
+            <span id="connection-info">Connecting to ws://localhost:8766...</span>
+        </div>
+    </footer>
+
+    <!-- JavaScript Modules -->
+    <script type="module" src="js/eeg-app.js"></script>
+</body>
+</html>

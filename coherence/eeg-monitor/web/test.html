@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EEG Monitor - WebSocket Test</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Monaco', 'Courier New', monospace;
+            background: #1a1a2e;
+            color: #eaeaea;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            color: #3282b8;
+            margin-bottom: 20px;
+        }
+
+        .panel {
+            background: #16213e;
+            border: 1px solid #2a3b5a;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .panel h2 {
+            color: #3282b8;
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+
+        .status {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #ff3333;
+        }
+
+        .status-dot.connected {
+            background: #00ff88;
+            box-shadow: 0 0 8px #00ff88;
+        }
+
+        .controls {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        button {
+            padding: 10px 15px;
+            background: #0f4c75;
+            color: #eaeaea;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+
+        button:hover {
+            background: #3282b8;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        input, select {
+            padding: 8px;
+            background: #0f1621;
+            border: 1px solid #2a3b5a;
+            border-radius: 6px;
+            color: #eaeaea;
+            font-family: inherit;
+            width: 100%;
+        }
+
+        .input-group {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .input-group label {
+            min-width: 120px;
+            font-size: 14px;
+            color: #a0a0a0;
+        }
+
+        .log-container {
+            background: #0f1621;
+            border: 1px solid #2a3b5a;
+            border-radius: 6px;
+            padding: 15px;
+            height: 400px;
+            overflow-y: auto;
+            font-size: 12px;
+            line-height: 1.6;
+        }
+
+        .log-entry {
+            margin-bottom: 8px;
+            padding: 5px;
+            border-radius: 4px;
+        }
+
+        .log-entry.sent {
+            color: #00b894;
+        }
+
+        .log-entry.received {
+            color: #0984e3;
+        }
+
+        .log-entry.error {
+            color: #ff3333;
+            background: rgba(255, 51, 51, 0.1);
+        }
+
+        .log-entry .timestamp {
+            color: #707070;
+            margin-right: 10px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+
+        .stat-item {
+            background: #0f1621;
+            padding: 15px;
+            border-radius: 6px;
+            border: 1px solid #2a3b5a;
+        }
+
+        .stat-label {
+            color: #a0a0a0;
+            font-size: 12px;
+            margin-bottom: 5px;
+        }
+
+        .stat-value {
+            color: #eaeaea;
+            font-size: 20px;
+            font-weight: bold;
+        }
+
+        .json-viewer {
+            background: #0f1621;
+            border: 1px solid #2a3b5a;
+            border-radius: 6px;
+            padding: 15px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .json-viewer pre {
+            margin: 0;
+            font-size: 12px;
+            color: #eaeaea;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #1a1a2e;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #0f4c75;
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #3282b8;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>EEG Monitor - WebSocket Test Console</h1>
+
+        <!-- Connection Panel -->
+        <div class="panel">
+            <h2>Connection</h2>
+            <div class="status">
+                <div class="status-dot" id="connection-indicator"></div>
+                <span id="connection-status">Disconnected</span>
+            </div>
+            <div class="input-group">
+                <label>WebSocket URL:</label>
+                <input type="text" id="ws-url" value="ws://localhost:8766">
+            </div>
+            <div class="controls">
+                <button id="connect-btn">Connect</button>
+                <button id="disconnect-btn" disabled>Disconnect</button>
+                <button id="clear-log-btn">Clear Log</button>
+            </div>
+        </div>
+
+        <!-- Commands Panel -->
+        <div class="panel">
+            <h2>Commands</h2>
+            <div class="controls">
+                <button class="command-btn" data-command="ping">Ping</button>
+                <button class="command-btn" data-command="request_status">Request Status</button>
+                <button class="command-btn" data-command="start_baseline">Start Baseline (60s)</button>
+                <button class="command-btn" data-command="finish_baseline">Finish Baseline</button>
+            </div>
+            <div class="input-group">
+                <label>Switch Protocol:</label>
+                <select id="protocol-select">
+                    <option value="alpha_enhancement">Alpha Enhancement</option>
+                    <option value="theta_beta_ratio">Theta/Beta Ratio</option>
+                    <option value="alpha_asymmetry">Alpha Asymmetry</option>
+                    <option value="theta_enhancement">Theta Enhancement</option>
+                    <option value="beta_enhancement">Beta Enhancement</option>
+                </select>
+                <button id="switch-protocol-btn">Switch</button>
+            </div>
+            <div class="input-group">
+                <label>Custom JSON:</label>
+                <input type="text" id="custom-json" placeholder='{"type": "ping"}'>
+                <button id="send-custom-btn">Send</button>
+            </div>
+        </div>
+
+        <!-- Statistics Panel -->
+        <div class="panel">
+            <h2>Statistics</h2>
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <div class="stat-label">Messages Sent</div>
+                    <div class="stat-value" id="stat-sent">0</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">Messages Received</div>
+                    <div class="stat-value" id="stat-received">0</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">Connection Attempts</div>
+                    <div class="stat-value" id="stat-attempts">0</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">Uptime</div>
+                    <div class="stat-value" id="stat-uptime">00:00</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Latest Message Panel -->
+        <div class="panel">
+            <h2>Latest Message</h2>
+            <div class="json-viewer">
+                <pre id="latest-message">No messages yet</pre>
+            </div>
+        </div>
+
+        <!-- Log Panel -->
+        <div class="panel">
+            <h2>Message Log</h2>
+            <div class="log-container" id="log-container">
+                <div class="log-entry">WebSocket test console ready</div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { createWebSocketClient } from './js/websocket-client.js';
+
+        let ws = null;
+        let stats = {
+            sent: 0,
+            received: 0,
+            attempts: 0,
+            connectedAt: null
+        };
+        let uptimeTimer = null;
+
+        // DOM elements
+        const elements = {
+            connectionIndicator: document.getElementById('connection-indicator'),
+            connectionStatus: document.getElementById('connection-status'),
+            wsUrl: document.getElementById('ws-url'),
+            connectBtn: document.getElementById('connect-btn'),
+            disconnectBtn: document.getElementById('disconnect-btn'),
+            clearLogBtn: document.getElementById('clear-log-btn'),
+            logContainer: document.getElementById('log-container'),
+            latestMessage: document.getElementById('latest-message'),
+            protocolSelect: document.getElementById('protocol-select'),
+            switchProtocolBtn: document.getElementById('switch-protocol-btn'),
+            customJson: document.getElementById('custom-json'),
+            sendCustomBtn: document.getElementById('send-custom-btn'),
+            statSent: document.getElementById('stat-sent'),
+            statReceived: document.getElementById('stat-received'),
+            statAttempts: document.getElementById('stat-attempts'),
+            statUptime: document.getElementById('stat-uptime')
+        };
+
+        // WebSocket handlers
+        const handlers = {
+            onOpen: () => {
+                log('Connected to WebSocket server', 'received');
+                elements.connectionIndicator.classList.add('connected');
+                elements.connectionStatus.textContent = 'Connected';
+                elements.connectBtn.disabled = true;
+                elements.disconnectBtn.disabled = false;
+                stats.connectedAt = Date.now();
+                startUptimeTimer();
+            },
+
+            onClose: () => {
+                log('Disconnected from WebSocket server', 'error');
+                elements.connectionIndicator.classList.remove('connected');
+                elements.connectionStatus.textContent = 'Disconnected';
+                elements.connectBtn.disabled = false;
+                elements.disconnectBtn.disabled = true;
+                stats.connectedAt = null;
+                stopUptimeTimer();
+            },
+
+            onError: (error) => {
+                log(`WebSocket error: ${error}`, 'error');
+            },
+
+            onMessage: (data) => {
+                stats.received++;
+                updateStats();
+                log(`Received: ${data.type}`, 'received');
+                elements.latestMessage.textContent = JSON.stringify(data, null, 2);
+            }
+        };
+
+        // Connect button
+        elements.connectBtn.addEventListener('click', () => {
+            const url = elements.wsUrl.value;
+            log(`Connecting to ${url}...`, 'sent');
+
+            stats.attempts++;
+            updateStats();
+
+            // Parse host and port from URL
+            const match = url.match(/ws:\/\/([^:]+):(\d+)/);
+            if (match) {
+                const [, host, port] = match;
+                ws = createWebSocketClient(handlers, host, parseInt(port));
+                ws.connect();
+            } else {
+                log('Invalid WebSocket URL format', 'error');
+            }
+        });
+
+        // Disconnect button
+        elements.disconnectBtn.addEventListener('click', () => {
+            if (ws) {
+                ws.disconnect();
+                log('Disconnecting...', 'sent');
+            }
+        });
+
+        // Clear log button
+        elements.clearLogBtn.addEventListener('click', () => {
+            elements.logContainer.innerHTML = '';
+        });
+
+        // Command buttons
+        document.querySelectorAll('.command-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const command = btn.dataset.command;
+                sendCommand(command);
+            });
+        });
+
+        // Switch protocol button
+        elements.switchProtocolBtn.addEventListener('click', () => {
+            const protocol = elements.protocolSelect.value;
+            if (ws) {
+                ws.switchProtocol(protocol);
+                stats.sent++;
+                updateStats();
+                log(`Sent: switch_protocol (${protocol})`, 'sent');
+            }
+        });
+
+        // Send custom JSON button
+        elements.sendCustomBtn.addEventListener('click', () => {
+            const jsonText = elements.customJson.value;
+            try {
+                const data = JSON.parse(jsonText);
+                if (ws && ws.send(data)) {
+                    stats.sent++;
+                    updateStats();
+                    log(`Sent: ${JSON.stringify(data)}`, 'sent');
+                } else {
+                    log('Failed to send (not connected)', 'error');
+                }
+            } catch (error) {
+                log(`Invalid JSON: ${error.message}`, 'error');
+            }
+        });
+
+        // Send command
+        function sendCommand(command) {
+            if (!ws) {
+                log('Not connected', 'error');
+                return;
+            }
+
+            let sent = false;
+
+            switch (command) {
+                case 'ping':
+                    ws.ping();
+                    sent = true;
+                    break;
+                case 'request_status':
+                    ws.requestStatus();
+                    sent = true;
+                    break;
+                case 'start_baseline':
+                    ws.startBaseline(60);
+                    sent = true;
+                    break;
+                case 'finish_baseline':
+                    ws.finishBaseline();
+                    sent = true;
+                    break;
+            }
+
+            if (sent) {
+                stats.sent++;
+                updateStats();
+                log(`Sent: ${command}`, 'sent');
+            }
+        }
+
+        // Log message
+        function log(message, type = '') {
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+
+            const timestamp = new Date().toLocaleTimeString();
+            entry.innerHTML = `<span class="timestamp">[${timestamp}]</span>${message}`;
+
+            elements.logContainer.appendChild(entry);
+            elements.logContainer.scrollTop = elements.logContainer.scrollHeight;
+        }
+
+        // Update statistics
+        function updateStats() {
+            elements.statSent.textContent = stats.sent;
+            elements.statReceived.textContent = stats.received;
+            elements.statAttempts.textContent = stats.attempts;
+        }
+
+        // Start uptime timer
+        function startUptimeTimer() {
+            uptimeTimer = setInterval(() => {
+                if (stats.connectedAt) {
+                    const uptime = Math.floor((Date.now() - stats.connectedAt) / 1000);
+                    const minutes = Math.floor(uptime / 60);
+                    const seconds = uptime % 60;
+                    elements.statUptime.textContent =
+                        `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+                }
+            }, 1000);
+        }
+
+        // Stop uptime timer
+        function stopUptimeTimer() {
+            if (uptimeTimer) {
+                clearInterval(uptimeTimer);
+                uptimeTimer = null;
+            }
+            elements.statUptime.textContent = '00:00';
+        }
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+            if (e.ctrlKey || e.metaKey) {
+                if (e.key === 'Enter') {
+                    elements.connectBtn.click();
+                } else if (e.key === 'k') {
+                    e.preventDefault();
+                    elements.clearLogBtn.click();
+                }
+            }
+        });
+
+        log('WebSocket test console loaded');
+        log('Press Connect to start');
+    </script>
+</body>
+</html>
