@@ -4,12 +4,9 @@
  * Allows interactive editing of koi shape parameters
  */
 
-import { KoiRenderer } from '../core/koi-renderer.js';
-import { DEFAULT_SHAPE_PARAMS, copyParams } from '../core/koi-params.js';
+// Rendering pipeline from the shared wooj-koi package (import map); editor UI stays local.
+import { KoiRenderer, DEFAULT_SHAPE_PARAMS, copyParams, VARIETIES, generatePattern, SVGParser, BrushTextures } from 'wooj-koi';
 import { EditorControls } from '../ui/editor-controls.js';
-import { VARIETIES, generatePattern } from '../core/koi-varieties.js';
-import { SVGParser } from '../core/svg-parser.js';
-import { BrushTextures } from '../rendering/brush-textures.js';
 
 // Global state
 let renderer;

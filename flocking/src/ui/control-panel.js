@@ -3,15 +3,23 @@
  * Handles UI controls for the simulation
  */
 
-import { RENDERING_CONFIG } from '../core/rendering-config.js';
-
 export class ControlPanel {
     constructor(params, callbacks) {
         this.params = params;
         this.callbacks = callbacks;
+        // Texture prefs live here (persisted to localStorage). The wooj-koi renderer only has a
+        // single brush-texture gate (renderer.parts.texture), driven via the onTexturesToggle
+        // callback; the per-part sub-toggles are kept for persistence but don't map to the
+        // simplified package renderer.
+        this.textureConfig = { enabled: true, paper: false, body: true, tail: true, fin: true, spot: false };
         this.initializeValues();
         this.loadTextureConfig();
         this.setupListeners();
+    }
+
+    /** Current master texture preference (read by the app to sync the renderer on startup). */
+    texturesEnabled() {
+        return this.textureConfig.enabled;
     }
 
     initializeValues() {
@@ -33,23 +41,24 @@ export class ControlPanel {
 
             const config = JSON.parse(saved);
 
-            // Apply to RENDERING_CONFIG
-            RENDERING_CONFIG.textures.enabled = config.enabled ?? true;
-            RENDERING_CONFIG.textures.paper.enabled = config.paper ?? true;
-            RENDERING_CONFIG.textures.body.enabled = config.body ?? true;
-            RENDERING_CONFIG.textures.tail.enabled = config.tail ?? true;
-            RENDERING_CONFIG.textures.fin.enabled = config.fin ?? true;
-            RENDERING_CONFIG.textures.spot.enabled = config.spot ?? false;
+            this.textureConfig = {
+                enabled: config.enabled ?? true,
+                paper: config.paper ?? false,
+                body: config.body ?? true,
+                tail: config.tail ?? true,
+                fin: config.fin ?? true,
+                spot: config.spot ?? false
+            };
 
             // Update UI checkboxes
-            document.getElementById('texturesEnabled').checked = config.enabled;
-            document.getElementById('paperTextureEnabled').checked = config.paper;
-            document.getElementById('bodyTextureEnabled').checked = config.body;
-            document.getElementById('tailTextureEnabled').checked = config.tail;
-            document.getElementById('finTextureEnabled').checked = config.fin;
-            document.getElementById('spotTextureEnabled').checked = config.spot;
+            document.getElementById('texturesEnabled').checked = this.textureConfig.enabled;
+            document.getElementById('paperTextureEnabled').checked = this.textureConfig.paper;
+            document.getElementById('bodyTextureEnabled').checked = this.textureConfig.body;
+            document.getElementById('tailTextureEnabled').checked = this.textureConfig.tail;
+            document.getElementById('finTextureEnabled').checked = this.textureConfig.fin;
+            document.getElementById('spotTextureEnabled').checked = this.textureConfig.spot;
 
-            console.log('Texture config loaded:', config);
+            console.log('Texture config loaded:', this.textureConfig);
         } catch (e) {
             console.warn('Failed to load texture config from localStorage:', e);
         }
@@ -59,18 +68,9 @@ export class ControlPanel {
      * Save texture configuration to localStorage
      */
     saveTextureConfig() {
-        const config = {
-            enabled: RENDERING_CONFIG.textures.enabled,
-            paper: RENDERING_CONFIG.textures.paper.enabled,
-            body: RENDERING_CONFIG.textures.body.enabled,
-            tail: RENDERING_CONFIG.textures.tail.enabled,
-            fin: RENDERING_CONFIG.textures.fin.enabled,
-            spot: RENDERING_CONFIG.textures.spot.enabled
-        };
-
         try {
-            localStorage.setItem('koi-texture-config', JSON.stringify(config));
-            console.log('Texture config saved:', config);
+            localStorage.setItem('koi-texture-config', JSON.stringify(this.textureConfig));
+            console.log('Texture config saved:', this.textureConfig);
         } catch (e) {
             console.warn('Failed to save texture config to localStorage:', e);
         }
@@ -156,39 +156,28 @@ export class ControlPanel {
         });
 
         // Texture controls
-        // Master texture toggle
+        // Master texture toggle — drives the renderer's brush-texture gate via the app callback.
         document.getElementById('texturesEnabled').addEventListener('change', (e) => {
-            RENDERING_CONFIG.textures.enabled = e.target.checked;
+            this.textureConfig.enabled = e.target.checked;
             const textureControls = document.getElementById('textureDetailControls');
             textureControls.style.opacity = e.target.checked ? 1 : 0.5;
+            if (this.callbacks.onTexturesToggle) this.callbacks.onTexturesToggle(e.target.checked);
             this.saveTextureConfig();
         });
 
-        // Individual texture toggles
-        document.getElementById('paperTextureEnabled').addEventListener('change', (e) => {
-            RENDERING_CONFIG.textures.paper.enabled = e.target.checked;
-            this.saveTextureConfig();
-        });
-
-        document.getElementById('bodyTextureEnabled').addEventListener('change', (e) => {
-            RENDERING_CONFIG.textures.body.enabled = e.target.checked;
-            this.saveTextureConfig();
-        });
-
-        document.getElementById('tailTextureEnabled').addEventListener('change', (e) => {
-            RENDERING_CONFIG.textures.tail.enabled = e.target.checked;
-            this.saveTextureConfig();
-        });
-
-        document.getElementById('finTextureEnabled').addEventListener('change', (e) => {
-            RENDERING_CONFIG.textures.fin.enabled = e.target.checked;
-            this.saveTextureConfig();
-        });
-
-        document.getElementById('spotTextureEnabled').addEventListener('change', (e) => {
-            RENDERING_CONFIG.textures.spot.enabled = e.target.checked;
-            this.saveTextureConfig();
-        });
+        // Per-part sub-toggles: persisted, but the simplified wooj-koi renderer has no per-part
+        // texture gate, so they don't currently affect rendering.
+        const subToggle = (id, key) => {
+            document.getElementById(id).addEventListener('change', (e) => {
+                this.textureConfig[key] = e.target.checked;
+                this.saveTextureConfig();
+            });
+        };
+        subToggle('paperTextureEnabled', 'paper');
+        subToggle('bodyTextureEnabled', 'body');
+        subToggle('tailTextureEnabled', 'tail');
+        subToggle('finTextureEnabled', 'fin');
+        subToggle('spotTextureEnabled', 'spot');
     }
 
     enablePlayPause() {

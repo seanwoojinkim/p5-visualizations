@@ -4,7 +4,7 @@
  * Stores koi appearance data (variety, pattern, size) but doesn't render itself
  */
 
-import { selectVariety, generatePattern } from '../core/koi-varieties.js';
+import { selectVariety, generatePattern } from 'wooj-koi';
 import { PHYSICS_CONFIG } from './physics-config.js';
 
 export class Boid {

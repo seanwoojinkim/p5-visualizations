@@ -256,6 +256,16 @@
         </div>
     </div>
 
+    <!-- The koi renderer/flock/varieties/configs come from the shared wooj-koi package,
+         vendored (no build step) into ./vendor by `npm run sync:koi`. Absolute path so it
+         resolves the same under the /flocking/ path and the /editor rewrite. -->
+    <script type="importmap">
+    {
+      "imports": {
+        "wooj-koi": "/flocking/vendor/wooj-koi/src/index.js"
+      }
+    }
+    </script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.7.0/p5.min.js"></script>
     <script type="module" src="src/apps/simulation-app.js"></script>
 </body>

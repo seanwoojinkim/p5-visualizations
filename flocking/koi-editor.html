@@ -276,6 +276,14 @@
         </div>
     </div>
 
+    <!-- Shared wooj-koi package, vendored into ./vendor by `npm run sync:koi` (no build step). -->
+    <script type="importmap">
+    {
+      "imports": {
+        "wooj-koi": "/flocking/vendor/wooj-koi/src/index.js"
+      }
+    }
+    </script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.7.0/p5.min.js"></script>
     <script type="module" src="src/apps/editor-app.js"></script>
 </body>

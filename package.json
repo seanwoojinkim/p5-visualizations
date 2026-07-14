@@ -5,13 +5,16 @@
   "private": true,
   "scripts": {
     "dev": "http-server -p 8000 -a 0.0.0.0 -o",
-    "start": "http-server -p 8000 -a 0.0.0.0"
+    "start": "http-server -p 8000 -a 0.0.0.0",
+    "sync:koi": "rm -rf flocking/vendor/wooj-koi && mkdir -p flocking/vendor/wooj-koi && cp -R node_modules/wooj-koi/src flocking/vendor/wooj-koi/src && echo 'synced wooj-koi -> flocking/vendor/wooj-koi/src'",
+    "postinstall": "npm run sync:koi"
   },
   "devDependencies": {
     "canvas": "^3.2.0",
     "http-server": "^14.1.1"
   },
   "dependencies": {
-    "node-unrar-js": "^2.0.2"
+    "node-unrar-js": "^2.0.2",
+    "wooj-koi": "github:woojdesign/wooj-koi#v0.1.9"
   }
 }

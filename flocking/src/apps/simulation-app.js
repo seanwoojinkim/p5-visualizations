@@ -7,12 +7,10 @@
 import { FlockManager } from '../flocking/flock-manager.js';
 import { AudioAnalyzer } from '../audio/audio-analyzer.js';
 import { PixelBuffer } from '../rendering/pixel-buffer.js';
-import { KoiRenderer } from '../core/koi-renderer.js';
-import { DEFAULT_SHAPE_PARAMS } from '../core/koi-params.js';
+// Rendering pipeline (renderer, params, brush, svg, config) comes from the shared wooj-koi
+// package via the import map; the flock/audio/environment stay app-local.
+import { KoiRenderer, DEFAULT_SHAPE_PARAMS, BrushTextures, SVGParser } from 'wooj-koi';
 import { ControlPanel } from '../ui/control-panel.js';
-import { BrushTextures } from '../rendering/brush-textures.js';
-import { SVGParser } from '../core/svg-parser.js';
-import { RENDERING_CONFIG } from '../core/rendering-config.js';
 import { LilypadManager } from '../environment/lilypad-manager.js';
 import { BlossomManager } from '../environment/blossom-manager.js';
 import { WaterBackground } from '../rendering/water-background.js';
@@ -54,8 +52,8 @@ const isSmallScreen = window.innerWidth < 1024;
 
 // Parameters with device-specific defaults
 let params = {
-    pixelScale: isMobile ? 5 : (isSmallScreen ? 2 : 2),  // Mobile: 5 for balance of quality/performance
-    numBoids: isMobile ? 15 : (isSmallScreen ? 50 : 80),  // Mobile: 15 fish (scalable based on FPS)
+    pixelScale: isMobile ? 2 : (isSmallScreen ? 2 : 2),  // Changed from 4 to 2 for desktop
+    numBoids: isMobile ? 20 : (isSmallScreen ? 50 : 80),
     maxSpeed: 0.5,
     maxForce: 0.05,  // Reduced from 0.1 for smoother steering (matches Processing standard)
     separationWeight: 0.9,  // Linear inverse (1/d) forces allow higher separation without jerky movement
@@ -65,10 +63,11 @@ let params = {
     audioReactivity: 0.5
 };
 
-// Base size scale - artistic sizing control
-// Mobile gets smaller fish due to performance constraints (less detail visible at pixelScale=6)
-const baseSizeScale = isMobile ? 1.5 : 2.0;  // Mobile: smaller fish for performance
-const environmentSizeScale = 1.0;  // Fixed at 1.0 for consistent environment visual size
+// Base size scale to compensate for pixelScale changes
+// For koi: baseSizeScale equals pixelScale to properly compensate for buffer scaling
+// For lilypads/blossoms: baseline is pixelScale=2 (their base sizes were designed for that)
+const baseSizeScale = params.pixelScale;
+const environmentSizeScale = params.pixelScale / 2;  // Baseline: pixelScale=2 → scale=1.0
 
 // Log device-optimized settings
 const deviceType = isMobile ? 'Mobile' : (isSmallScreen ? 'Tablet' : 'Desktop');
@@ -226,8 +225,8 @@ window.setup = function() {
     renderer = new KoiRenderer(brushTextures);
 
     // Initialize lilypad manager
-    // Disabled on mobile for performance (Galaxy A32 can't handle them at 8fps)
-    const lilypadCount = isMobile ? 0 : (isSmallScreen ? 4 : 5);
+    // Create a few lilypads per screen (3-5 depending on screen size)
+    const lilypadCount = isMobile ? 3 : (isSmallScreen ? 4 : 5);
     lilypadManager = new LilypadManager(
         lilypadImages,
         lilypadCount,
@@ -242,9 +241,9 @@ window.setup = function() {
     lilypadManager.setSizeScale(environmentSizeScale);
 
     // Initialize blossom manager
-    // Disabled on mobile for performance (Galaxy A32 can't handle them at 8fps)
+    // Spawn new blossoms periodically (every 2 seconds at 60fps)
     const blossomSpawnRate = 120;
-    const maxBlossoms = isMobile ? 0 : (isSmallScreen ? 12 : 15);
+    const maxBlossoms = isMobile ? 10 : (isSmallScreen ? 12 : 15);
     blossomManager = new BlossomManager(
         blossomImages,
         blossomSpawnRate,
@@ -280,25 +279,36 @@ window.setup = function() {
             flock.width = bufferDims.width;
             flock.height = bufferDims.height;
 
-            // Note: Environment size scale is now constant (1.0), not tied to pixelScale
-            // This ensures consistent visual size regardless of pixel scale setting
+            // Update size scale for lilypads and blossoms
+            // environmentSizeScale uses pixelScale=2 as baseline (scale / 2)
+            const newEnvironmentSizeScale = scale / 2;
+            if (lilypadManager) {
+                lilypadManager.setSizeScale(newEnvironmentSizeScale);
+            }
+            if (blossomManager) {
+                blossomManager.setSizeScale(newEnvironmentSizeScale);
+            }
         },
         onBoidCountChange: (count) => {
             flock.resize(count);
         },
         onReset: () => {
             flock.reset();
+        },
+        // The wooj-koi renderer gates the brush texture via renderer.parts.texture,
+        // not a config flag, so the master texture toggle flips that here.
+        onTexturesToggle: (enabled) => {
+            if (renderer) renderer.parts.texture = enabled;
         }
     });
+    // Sync the renderer to whatever the control panel restored from localStorage.
+    renderer.parts.texture = controlPanel.texturesEnabled();
 
     // Set up toggle controls
     setupToggleControls();
 
     // Set up keyboard controls
     setupKeyboardControls();
-
-    // Set up touch controls for mobile
-    setupTouchControls();
 };
 
 // Set up toggle controls
@@ -343,44 +353,16 @@ function setupKeyboardControls() {
                 console.log('Debug vectors:', debugVectors ? 'ON' : 'OFF');
                 break;
             case 't':
-                // Toggle textures on/off
-                RENDERING_CONFIG.textures.enabled = !RENDERING_CONFIG.textures.enabled;
-                console.log('Textures:', RENDERING_CONFIG.textures.enabled ? 'ON' : 'OFF');
-
-                // Update UI checkbox if control panel exists
-                const textureToggle = document.getElementById('texturesEnabled');
-                if (textureToggle) {
-                    textureToggle.checked = RENDERING_CONFIG.textures.enabled;
+                // Toggle the brush texture on/off (renderer.parts.texture is the gate).
+                if (renderer) {
+                    renderer.parts.texture = !renderer.parts.texture;
+                    console.log('Textures:', renderer.parts.texture ? 'ON' : 'OFF');
+                    const textureToggle = document.getElementById('texturesEnabled');
+                    if (textureToggle) textureToggle.checked = renderer.parts.texture;
                 }
                 break;
         }
     });
-}
-
-// Set up touch controls for mobile
-function setupTouchControls() {
-    let touchStartTime = 0;
-    let touchStartCount = 0;
-
-    document.addEventListener('touchstart', (e) => {
-        if (e.touches.length === 3) {
-            touchStartTime = Date.now();
-            touchStartCount = 3;
-        }
-    }, { passive: true });
-
-    document.addEventListener('touchend', (e) => {
-        // Check if we had 3 fingers at start and the tap was quick
-        if (touchStartCount === 3 && Date.now() - touchStartTime < 300) {
-            debugVectors = !debugVectors;
-            console.log('Debug FPS (three-finger tap):', debugVectors ? 'ON' : 'OFF');
-        }
-
-        // Reset counter when all touches are released
-        if (e.touches.length === 0) {
-            touchStartCount = 0;
-        }
-    }, { passive: true });
 }
 
 // p5.js draw function
@@ -416,6 +398,18 @@ window.draw = function() {
         const velocityOffset = boid.velocity.mag() * 3.0; // Affects phase, not rate
         const waveTime = baseWave + velocityOffset + boid.animationOffset;
 
+        // Motion signals the wooj-koi renderer uses for the arc body-bend and the tail
+        // dynamics. This app's flock doesn't expose them, so derive them from the boid's
+        // velocity: fraction of top speed, and a low-passed turn rate (heading change/frame).
+        const heading = boid.velocity.heading();
+        if (boid._prevHeading === undefined) boid._prevHeading = heading;
+        let dHeading = heading - boid._prevHeading;
+        while (dHeading > Math.PI) dHeading -= Math.PI * 2;
+        while (dHeading < -Math.PI) dHeading += Math.PI * 2;
+        boid._prevHeading = heading;
+        boid._turnRate = (boid._turnRate ?? 0) + (dHeading - (boid._turnRate ?? 0)) * 0.08;
+        const speedFraction = Math.min(1, boid.velocity.mag() / (params.maxSpeed || 1));
+
         // Debug mode: Show escaping koi in red
         let debugColor = boid.color;
         if (debugVectors) {
@@ -430,7 +424,7 @@ window.draw = function() {
             pg,
             boid.position.x,
             boid.position.y,
-            boid.velocity.heading(),
+            heading,
             {
                 shapeParams: DEFAULT_SHAPE_PARAMS,
                 colorParams: debugColor,
@@ -440,7 +434,9 @@ window.draw = function() {
                     sizeScale: boid.sizeMultiplier * baseSizeScale,  // Apply base size scale for rendering
                     waveAmplitudeScale: boid.sizeMultiplier,  // Wave amplitude uses natural size only (no baseSizeScale)
                     lengthMultiplier: boid.lengthMultiplier,
-                    tailLength: boid.tailLength
+                    tailLength: boid.tailLength,
+                    speedFraction,          // drives tail wag + fork pinch
+                    turnRate: boid._turnRate // drives the arc body-bend through the turn
                 },
                 modifiers: {
                     brightnessBoost: audioData.bass * 8 * params.audioReactivity,

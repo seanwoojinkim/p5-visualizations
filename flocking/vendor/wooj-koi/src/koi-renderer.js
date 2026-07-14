@@ -8,6 +8,28 @@ import { DEFAULT_SHAPE_PARAMS } from './koi-params.js';
 import { ANIMATION_CONFIG } from './animation-config.js';
 import { RENDERING_CONFIG } from './rendering-config.js';
 
+// Body bend when turning — the centerline is a true CIRCULAR ARC of the turn's curvature,
+// not a parabola. The old `bend·t²` was measured from the HEAD (t=0), so the head stayed put
+// and deflection piled up quadratically toward the tail — flinging the tail out and stretching
+// the wrist while the front stayed rigid. Instead: each spine point at body-axis offset u (px
+// from the anchor) sits on a circle of curvature κ, so its perpendicular offset is
+//   y(u) = (1 − cos(κ·u)) / κ.
+// That's EVEN in u (head and tail curve the same way toward the turn centre → the curvature is
+// distributed along the whole body, "beginning" at the middle), and it's BOUNDED (the tail
+// follows the arc instead of a runaway t²). Offset is 0 at the anchor (u=0), so the fish stays
+// on its path. Drawn deflection = y·sizeScale (the deform scales the spine), so we return units.
+// `match` = the fraction of the path curvature the body takes (1 = lies exactly on the rail);
+// `maxCurve` caps how tight the body itself will bend (px⁻¹).
+export const KOI_BEND = { match: 1.0, maxCurve: 0.02 };
+function koiCurvature(turnRate) {
+    return Math.max(-KOI_BEND.maxCurve, Math.min(KOI_BEND.maxCurve, KOI_BEND.match * turnRate));
+}
+// Perpendicular spine offset (in vertex units) at body-axis position xPx, for a given curvature.
+function arcOffset(curvature, xPx, sizeScale) {
+    if (Math.abs(curvature) < 1e-6) return 0;
+    return (1 - Math.cos(curvature * xPx)) / curvature / sizeScale;
+}
+
 /**
  * Brush Texture Rendering Constants
  */
@@ -136,6 +158,9 @@ export class KoiRenderer {
         this.brushTextures = brushTextures;
         this.useSumieStyle = brushTextures !== null && brushTextures.isReady;
 
+        // Debug: toggle individual layers on/off (set by the tester to isolate parts).
+        this.parts = { fins: true, body: true, tail: true, head: true, texture: true, spots: true, skeleton: false };
+
         // Wave value cache for performance (eliminates ~800 Math.sin() calls per frame)
         this.waveCache = null;
         this.lastWaveTime = -1;
@@ -219,11 +244,22 @@ export class KoiRenderer {
             }
         } = params;
 
-        const { waveTime, sizeScale, lengthMultiplier = 1, tailLength = 1, waveAmplitudeScale = 1 } = animationParams;
+        // Don't draw until the body SVG has loaded. p5's async preload blocks setup on the
+        // tracked loadImage calls but NOT on the awaited SVG fetches, so for the first frames
+        // after a load svgVertices.body is still null — rendering then would flash the old
+        // un-textured procedural koi (the "bad vectors") before the sumi-e outline arrives.
+        if (!(svgVertices.body && svgVertices.body.length > 0)) return;
+
+        const { waveTime, sizeScale, lengthMultiplier = 1, tailLength = 1, waveAmplitudeScale = 1, turnRate = 0, speedFraction = 0, flick = 0 } = animationParams;
         const { brightnessBoost = 0, saturationBoost = 0, sizeScale: modifierSizeScale = 1 } = modifiers;
 
         // Apply modifier size scaling
         const finalSizeScale = sizeScale * modifierSizeScale;
+        const curvature = koiCurvature(turnRate); // circular-arc body bend (see koiCurvature)
+
+        // Swim gait: undulation amplitude glides low then flicks to full (flick 0→1).
+        const flickAmp = ANIMATION_CONFIG.wave.glideAmp + (1 - ANIMATION_CONFIG.wave.glideAmp) * flick;
+        const swimAmp = waveAmplitudeScale * flickAmp;
 
         // Calculate body segment positions
         const segmentPositions = this.calculateSegments(
@@ -232,7 +268,8 @@ export class KoiRenderer {
             finalSizeScale,
             lengthMultiplier,
             shapeParams,
-            waveAmplitudeScale  // Separate wave amplitude scaling from size scaling
+            swimAmp,             // wave amplitude (base × gait flick)
+            curvature            // Body arc curvature when turning
         );
 
         // Save graphics state
@@ -254,44 +291,146 @@ export class KoiRenderer {
         // 5. Spots (on top of head)
         // 6. Dorsal fin (drawn last, appears on top of body)
 
-        this.drawFins(context, segmentPositions, shapeParams, waveTime, finalSizeScale, hue, saturation, brightness, {
+        const show = this.parts;
+
+        if (show.fins) this.drawFins(context, segmentPositions, shapeParams, waveTime, finalSizeScale, hue, saturation, brightness, {
             pectoralFin: svgVertices.pectoralFin,
             dorsalFin: null, // Don't draw dorsal fin yet
             ventralFin: svgVertices.ventralFin
         });
-        this.drawTail(context, segmentPositions, shapeParams, waveTime, finalSizeScale, tailLength, hue, saturation, brightness, svgVertices.tail, waveAmplitudeScale);
-
-        // Use SVG body if vertices provided, otherwise use procedural body
-        if (svgVertices.body && Array.isArray(svgVertices.body) && svgVertices.body.length > 0) {
-            this.drawBodyFromSVG(context, segmentPositions, svgVertices.body, shapeParams, finalSizeScale, hue, saturation, brightness);
-        } else {
-            this.drawBody(context, segmentPositions, shapeParams, finalSizeScale, hue, saturation, brightness);
+        // The caudal fin is a SEPARATE shape, pinned + rotated at the body-end tangent (drawn
+        // BEHIND the body so the wrist tucks under it), so it's a distinct trailing fin rather
+        // than a continuation of the body outline. It stays attached because it's placed at the
+        // body's actual arc-end point with the body's exit tangent.
+        const hasBodySvg = svgVertices.body && Array.isArray(svgVertices.body) && svgVertices.body.length > 0;
+        if (show.tail && hasBodySvg) {
+            this.drawPinnedTail(context, segmentPositions, finalSizeScale, tailLength, waveTime, waveAmplitudeScale, speedFraction, flick, hue, saturation, brightness);
+        }
+        if (show.body) {
+            if (hasBodySvg) {
+                this.drawBodyFromSVG(context, segmentPositions, svgVertices.body, shapeParams, finalSizeScale, hue, saturation, brightness);
+            } else {
+                this.drawTail(context, segmentPositions, shapeParams, waveTime, finalSizeScale, tailLength, hue, saturation, brightness, svgVertices.tail, waveAmplitudeScale, curvature);
+                this.drawBody(context, segmentPositions, shapeParams, finalSizeScale, hue, saturation, brightness);
+            }
         }
 
-        this.drawHead(context, segmentPositions[0], shapeParams, finalSizeScale, hue, saturation, brightness, svgVertices.head);
+        if (show.head) {
+            // Head angle: the local arc tangent at the head, so the head follows the curve
+            // (pinned to the body front) instead of pointing along the base heading.
+            const s0 = segmentPositions[0], s1 = segmentPositions[1] || s0;
+            const headAngle = Math.atan2((s0.y - s1.y) * finalSizeScale, s0.x - s1.x);
+            this.drawHead(context, s0, shapeParams, finalSizeScale, hue, saturation, brightness, svgVertices.head, headAngle);
+        }
 
         // Clip body texture and spots to body+head outline for cleaner appearance
         // Single clipping region shared by both operations (performance optimization)
-        this.clipToBodyAndHead(context, segmentPositions, svgVertices, shapeParams, finalSizeScale);
-        this.applyBodyTexture(context, segmentPositions, shapeParams, finalSizeScale, hue, saturation, brightness, svgVertices);
-        this.drawSpots(context, segmentPositions, pattern.spots || [], finalSizeScale, boidSeed, angle, brightness);
-        context.drawingContext.restore(); // Remove clip
+        if (show.body && (show.texture || show.spots)) {
+            this.clipToBodyAndHead(context, segmentPositions, svgVertices, shapeParams, finalSizeScale);
+            if (show.texture) this.applyBodyTexture(context, segmentPositions, shapeParams, finalSizeScale, hue, saturation, brightness, svgVertices);
+            if (show.spots) this.drawSpots(context, segmentPositions, pattern.spots || [], finalSizeScale, boidSeed, angle, brightness);
+            context.drawingContext.restore(); // Remove clip
+        }
 
         // Draw dorsal fin last so it appears on top of the body
-        this.drawFins(context, segmentPositions, shapeParams, waveTime, finalSizeScale, hue, saturation, brightness, {
+        if (show.fins) this.drawFins(context, segmentPositions, shapeParams, waveTime, finalSizeScale, hue, saturation, brightness, {
             pectoralFin: null, // Don't draw pectoral fins again
             dorsalFin: svgVertices.dorsalFin, // Only draw dorsal fin
             ventralFin: null // Don't draw ventral fins again
         });
+
+        // Debug: the deformer skeleton (spine centerline + rib normals) over the fish.
+        if (show.skeleton) this.drawSkeleton(context, segmentPositions, finalSizeScale);
 
         // Restore graphics state
         context.pop();
     }
 
     /**
+     * Draw the caudal fin as a SEPARATE shape, pinned at the body's arc-end point and rotated
+     * to the body's exit tangent (with a gentle flap). Because it's placed at the real end
+     * point + tangent, it stays attached without being part of the body's deforming outline.
+     */
+    drawPinnedTail(context, bodySegments, sizeScale, tailLength, waveTime, waveAmplitudeScale, speedFraction, flick, hue, saturation, brightness) {
+        const n = bodySegments.length;
+        if (n < 2) return;
+        const end = bodySegments[n - 1], prev = bodySegments[n - 2];
+        const ax = end.x, ay = end.y * sizeScale;                                    // body-end point (drawn px)
+        const tangent = Math.atan2((end.y - prev.y) * sizeScale, end.x - prev.x);     // toward the tail (backward)
+
+        // Movement-tied dynamics. The wag beats with the swimming rhythm (waveTime advances with
+        // speed) and grows with forward speed; the tips LAG the wrist for flow; and the fork
+        // draws together as the fish drives forward (water forcing the fins back).
+        const spd = Math.max(0, Math.min(1, speedFraction));
+        const grade = ANIMATION_CONFIG.wave.phaseGradient;
+        // wag drive: scales with speed AND the gait flick (a hard tail-kick on the burst).
+        const ga = ANIMATION_CONFIG.wave.glideAmp;
+        const wagDrive = (0.25 + 0.75 * spd) * (ga + (1 - ga) * (flick || 0));
+        const flap = Math.sin(waveTime - grade) * 0.20 * wagDrive;                    // whole-fan wag (rad)
+        const tipSway = Math.sin(waveTime - grade - 0.9) * 0.45 * wagDrive;           // lagged tip sway (units) → flow
+        const pinch = 1 - 0.35 * spd;                                                 // fork narrows with speed
+
+        // Forked caudal fan (SVG units), wrist at local origin, lobes extending -x. Narrow wrist
+        // (fine attachment) widening to the lobes; f scaled by `pinch`; tips carry the lagged sway.
+        const tailScale = Math.min(1, 0.55 + 0.45 * (tailLength - 0.9) / 0.9);
+        const r = 7.5 * tailScale, f = 3.6 * tailScale * pinch;
+        const fan = [
+            { x: r * 0.1,    y: +f * 0.06 },
+            { x: -r * 0.5,   y: +f * 0.55 + tipSway * 0.4 },
+            { x: -r * 0.9,   y: +f + tipSway },              // upper lobe tip (leads the sway)
+            { x: -r * 0.7,   y: +f * 0.25 + tipSway * 0.6 },
+            { x: -r * 0.5,   y: 0 + tipSway * 0.3 },         // center notch
+            { x: -r * 0.7,   y: -f * 0.25 + tipSway * 0.6 },
+            { x: -r * 0.9,   y: -f + tipSway },              // lower lobe tip
+            { x: -r * 0.5,   y: -f * 0.55 + tipSway * 0.4 },
+            { x: r * 0.1,    y: -f * 0.06 },
+        ];
+        context.push();
+        context.translate(ax, ay);
+        context.rotate(tangent - Math.PI + flap); // fan's local -x aligns with the body's exit tangent
+        this.drawSVGShape(context, fan, {
+            deformationType: 'static', deformationParams: {},
+            positionX: 0, positionY: 0, rotation: 0, scale: sizeScale,
+            hue, saturation, brightness, opacity: RENDERING_CONFIG.opacity.tail, mirror: 'none'
+        });
+        context.pop();
+    }
+
+    /**
+     * Debug overlay: draw the deformer skeleton — the spine centerline that drives the body
+     * deformation, plus a rib normal at each joint (so you can see the rib rotation and where
+     * the tail's spine diverges). Drawn in the fish's local (translated + rotated) frame; the
+     * spine point is (segment.x [px], segment.y·sizeScale [units→px]).
+     */
+    drawSkeleton(context, segments, sizeScale) {
+        if (!segments || segments.length < 2) return;
+        context.push();
+        context.noFill();
+        // spine centerline
+        context.stroke(205, 85, 60); context.strokeWeight(2);
+        context.beginShape();
+        for (const s of segments) context.vertex(s.x, s.y * sizeScale);
+        context.endShape();
+        // rib normal + joint at each segment
+        const n = segments.length;
+        for (let i = 0; i < n; i++) {
+            const s = segments[i];
+            const px = s.x, py = s.y * sizeScale;
+            const a = segments[Math.max(0, i - 1)], b = segments[Math.min(n - 1, i + 1)];
+            const th = Math.atan2((b.y - a.y) * sizeScale, b.x - a.x);
+            const nx = -Math.sin(th), ny = Math.cos(th), L = 12;
+            context.stroke(48, 90, 90); context.strokeWeight(1.5);
+            context.line(px - nx * L, py - ny * L, px + nx * L, py + ny * L);
+            context.stroke(340, 80, 95); context.strokeWeight(5);
+            context.point(px, py);
+        }
+        context.pop();
+    }
+
+    /**
      * Calculate body segment positions with swimming wave motion
      */
-    calculateSegments(numSegments, waveTime, sizeScale, lengthMultiplier, shapeParams = DEFAULT_SHAPE_PARAMS, waveAmplitudeScale = 1.0) {
+    calculateSegments(numSegments, waveTime, sizeScale, lengthMultiplier, shapeParams = DEFAULT_SHAPE_PARAMS, waveAmplitudeScale = 1.0, curvature = 0) {
         // Pre-compute wave values once per frame (performance optimization)
         // Eliminates ~800 Math.sin() calls per frame by caching when time changes
         if (waveTime !== this.lastWaveTime || numSegments !== this.lastNumSegments) {
@@ -304,6 +443,8 @@ export class KoiRenderer {
             this.lastNumSegments = numSegments;
         }
 
+        // The spine curve when turning is a circular arc of `curvature` about the anchor,
+        // continued into the tail, so body and tail stay one connected arc.
         const segments = [];
 
         for (let i = 0; i < numSegments; i++) {
@@ -311,9 +452,11 @@ export class KoiRenderer {
             const x = this.lerp(7, -9, t) * sizeScale * lengthMultiplier;
             // Wave amplitude uses separate scaling to avoid exaggerated motion when rendering at larger sizes
             // Use cached wave value instead of calling Math.sin() (performance optimization)
-            const y = this.waveCache[i] *
+            const wave = this.waveCache[i] *
                       ANIMATION_CONFIG.wave.amplitude * waveAmplitudeScale *
-                      (1 - t * ANIMATION_CONFIG.wave.dampening);
+                      // amplitude envelope: calm at the head, growing toward the tail (the "whip")
+                      (ANIMATION_CONFIG.wave.headAmp + (1 - ANIMATION_CONFIG.wave.headAmp) * Math.pow(t, ANIMATION_CONFIG.wave.tailPower));
+            const y = wave + arcOffset(curvature, x, sizeScale); // swimming wave + circular-arc bend
 
             // Calculate width based on position using new parameters
             // Create a smooth curve from front to peak to tail
@@ -384,7 +527,7 @@ export class KoiRenderer {
                 ySwayPhase: 0
             },
             positionX: segmentPos.x,
-            positionY: segmentPos.y + yOffset * sizeScale + sway,
+            positionY: segmentPos.y * sizeScale + yOffset * sizeScale + sway, // segment.y is SVG units → ×sizeScale so the fin follows the arc
             rotation: baseAngle, // Base angle applied to entire shape
             scale: sizeScale,
             hue,
@@ -423,21 +566,21 @@ export class KoiRenderer {
 
         if (useSVG) {
             // SVG-based fin rendering
-            const finSway = Math.sin(waveTime - 0.5) * ANIMATION_CONFIG.fins.pectoral.swayAmplitude;
-
             // Pectoral fins (left and right)
             const finPos = segmentPositions[shapeParams.pectoralPos];
             if (!finPos) return; // Guard: ensure pectoral position segment exists
 
             if (svgVertices.pectoralFin) {
+                // Pectorals just "hang loose" — no active sway or rotation, held in a fixed
+                // relaxed pose and carried along by the body. (No finSway, zero rotation amp.)
                 // Top pectoral fin (left)
                 this.drawFinFromSVG(
                     context, finPos, svgVertices.pectoralFin,
                     shapeParams.pectoralYTop,
                     shapeParams.pectoralAngleTop,
                     waveTime,
-                    ANIMATION_CONFIG.fins.pectoral.rotationAmplitude,
-                    finSway,
+                    0,
+                    0,
                     sizeScale,
                     hue, saturation, brightness,
                     'none'
@@ -449,8 +592,8 @@ export class KoiRenderer {
                     shapeParams.pectoralYBottom,
                     shapeParams.pectoralAngleBottom,
                     waveTime,
-                    -ANIMATION_CONFIG.fins.pectoral.rotationAmplitude, // Negative for opposite rotation
-                    -finSway, // Opposite sway
+                    0,
+                    0,
                     sizeScale,
                     hue, saturation, brightness,
                     'vertical' // Mirror vertically for bottom fin
@@ -481,7 +624,7 @@ export class KoiRenderer {
                         numSegments: dorsalSegments.length
                     },
                     positionX: segmentPositions[shapeParams.dorsalPos].x,
-                    positionY: segmentPositions[shapeParams.dorsalPos].y + shapeParams.dorsalY * sizeScale,
+                    positionY: segmentPositions[shapeParams.dorsalPos].y * sizeScale + shapeParams.dorsalY * sizeScale, // ×sizeScale: segment.y is SVG units
                     rotation: 0,
                     scale: sizeScale,
                     hue,
@@ -497,13 +640,14 @@ export class KoiRenderer {
             if (!ventralPos) return; // Guard: ensure ventral position segment exists
 
             if (svgVertices.ventralFin) {
+                // Ventrals also hang loose — fixed relaxed pose, no rotation or sway.
                 // Top ventral fin
                 this.drawFinFromSVG(
                     context, ventralPos, svgVertices.ventralFin,
                     shapeParams.ventralYTop,
                     shapeParams.ventralAngleTop,
                     waveTime,
-                    ANIMATION_CONFIG.fins.ventral.rotationAmplitude,
+                    0,
                     0, // No sway
                     sizeScale,
                     hue, saturation, brightness,
@@ -516,7 +660,7 @@ export class KoiRenderer {
                     shapeParams.ventralYBottom,
                     shapeParams.ventralAngleBottom,
                     waveTime,
-                    -ANIMATION_CONFIG.fins.ventral.rotationAmplitude, // Opposite rotation
+                    0,
                     0,
                     sizeScale,
                     hue, saturation, brightness,
@@ -629,7 +773,7 @@ export class KoiRenderer {
      * @param {number} saturation - HSB saturation
      * @param {number} brightness - HSB brightness
      */
-    drawTailFromSVG(context, segmentPositions, svgVertices, shapeParams, waveTime, sizeScale, tailLength, hue, saturation, brightness, waveAmplitudeScale = 1.0) {
+    drawTailFromSVG(context, segmentPositions, svgVertices, shapeParams, waveTime, sizeScale, tailLength, hue, saturation, brightness, waveAmplitudeScale = 1.0, bend = 0) {
         // Guard: Validate inputs
         if (!svgVertices || !Array.isArray(svgVertices) || svgVertices.length === 0) {
             return; // Cannot draw tail without vertices
@@ -642,12 +786,8 @@ export class KoiRenderer {
         if (!tailBase) return; // Guard: ensure tail base segment exists
         const tailStartX = tailBase.x + shapeParams.tailStartX * sizeScale;
 
-        // Calculate tail's rightmost edge (connection point to body)
-        // This ensures the tail connects seamlessly regardless of SVG shape
         const tailXCoords = svgVertices.map(v => v.x);
         const tailRightEdge = Math.max(...tailXCoords);
-
-        // Position tail so its right edge aligns with tailStartX
         const tailConnectionX = tailStartX - (tailRightEdge * sizeScale * tailLength);
 
         // Create extended segments for tail (continues body wave motion)
@@ -662,9 +802,14 @@ export class KoiRenderer {
             // Continue the wave formula from body
             // But adjust t to continue from where body left off
             const waveT = 1 + (t * PROCEDURAL_RENDERING.tail.WAVE_CONTINUATION); // Continue wave beyond body end (t=1)
-            const y = Math.sin(waveTime - waveT * ANIMATION_CONFIG.wave.phaseGradient) *
+            const wave = Math.sin(waveTime - waveT * ANIMATION_CONFIG.wave.phaseGradient) *
                       ANIMATION_CONFIG.wave.amplitude * waveAmplitudeScale *
                       (1 - waveT * ANIMATION_CONFIG.wave.dampening);
+            // The body's bend at the join is `bend` (t=1). The tail runs past t=1 (waveT up
+            // to ~2), so continuing the parabola would fling the tail tip out ~4×. Instead
+            // hold near the join value with a gentle continuation, /tailLength for the scale.
+            const tailBend = bend * (1 + 0.3 * (waveT - 1));
+            const y = (wave + tailBend) / tailLength;
             tailSegments.push({ x, y, w: 0 });
         }
 
@@ -690,7 +835,7 @@ export class KoiRenderer {
      * Draw tail with flowing motion
      * Uses SVG if vertices provided, otherwise uses procedural rendering
      */
-    drawTail(context, segmentPositions, shapeParams, waveTime, sizeScale, tailLength, hue, saturation, brightness, svgVertices = null, waveAmplitudeScale = 1.0) {
+    drawTail(context, segmentPositions, shapeParams, waveTime, sizeScale, tailLength, hue, saturation, brightness, svgVertices = null, waveAmplitudeScale = 1.0, bend = 0) {
         // Guard: Validate segment positions
         if (!segmentPositions || !Array.isArray(segmentPositions) || segmentPositions.length === 0) {
             return; // Cannot draw tail without segments
@@ -698,7 +843,7 @@ export class KoiRenderer {
 
         // Use SVG if provided, otherwise procedural
         if (svgVertices && Array.isArray(svgVertices) && svgVertices.length > 0) {
-            this.drawTailFromSVG(context, segmentPositions, svgVertices, shapeParams, waveTime, sizeScale, tailLength, hue, saturation, brightness, waveAmplitudeScale);
+            this.drawTailFromSVG(context, segmentPositions, svgVertices, shapeParams, waveTime, sizeScale, tailLength, hue, saturation, brightness, waveAmplitudeScale, bend);
             return;
         }
 
@@ -783,7 +928,7 @@ export class KoiRenderer {
             return vertices; // No deformation possible, return original
         }
 
-        const { segmentPositions, numSegments } = params;
+        const { segmentPositions, numSegments, sizeScale } = params;
 
         // Calculate X bounds once for all vertices (optimized - no intermediate array)
         let minX = Infinity;
@@ -828,11 +973,21 @@ export class KoiRenderer {
             // Linear interpolation between segments
             const interpolatedY = currentY + (nextY - currentY) * blend;
 
-            // Create new vertex object with deformed Y coordinate
-            result[i] = {
-                x: v.x,
-                y: v.y + interpolatedY
-            };
+            if (sizeScale) {
+                // Rib rotation (normal-ribbon bend): rotate the vertex's perpendicular offset
+                // (v.y) to follow the spine's tangent instead of only shifting it up. Otherwise
+                // the outline SHEARS where the spine is steep — which is exactly the tail, so
+                // the tail looked disproportionately distorted vs the barely-sloped body. The
+                // spine point stays at (v.x, interpolatedY); the rib is placed along its normal.
+                const iA = Math.max(0, currentIdx - 1);
+                const iB = Math.min(numSegments - 1, currentIdx + 1);
+                const dX = segmentPositions[iB].x - segmentPositions[iA].x;            // px
+                const dY = (segmentPositions[iB].y - segmentPositions[iA].y) * sizeScale; // units→px
+                const theta = Math.atan2(dY, dX);                                     // spine tangent
+                result[i] = { x: v.x - v.y * Math.sin(theta), y: interpolatedY + v.y * Math.cos(theta) };
+            } else {
+                result[i] = { x: v.x, y: v.y + interpolatedY };
+            }
         }
 
         return result;
@@ -1158,6 +1313,59 @@ export class KoiRenderer {
      * @param {number} saturation - HSB saturation
      * @param {number} brightness - HSB brightness
      */
+    /**
+     * Extend the body into a tail so it's ONE shape over ONE bent centerline (can't
+     * detach). Continues the body's segments (same wave + circular-arc bend, t running past 1)
+     * and splices a tail fan into the body's vertex loop at its tail-end (leftmost) edge.
+     * @returns {{ verts: Array<{x,y}>, segments: Array<{x,y,w}> }}
+     */
+    extendBodyWithTail(bodyVerts, bodySegments, sizeScale, lengthMultiplier, waveTime, waveAmplitudeScale, curvature, tailLength = 1.2) {
+        const numSeg = bodySegments.length;
+        const numTail = 7;
+        const segments = bodySegments.slice();
+        // The caudal fin is STIFF: rather than continuing the body's arc (which over-curls and
+        // flings the tail), it trails STRAIGHT along the body-end tangent. Junction point + the
+        // arc's slope there (units per px = sin(κx)/sizeScale); the tail is that tangent line.
+        const xJ = bodySegments[numSeg - 1].x;
+        const yJ = arcOffset(curvature, xJ, sizeScale);
+        const slopeJ = Math.abs(curvature) < 1e-6 ? 0 : Math.sin(curvature * xJ) / sizeScale;
+        for (let j = 1; j <= numTail; j++) {
+            const t = (numSeg - 1 + j) / numSeg; // continue past t = 1 into the tail
+            const x = this.lerp(7, -9, t) * sizeScale * lengthMultiplier;
+            const wave = Math.sin(waveTime - t * ANIMATION_CONFIG.wave.phaseGradient) *
+                         ANIMATION_CONFIG.wave.amplitude * waveAmplitudeScale *
+                         (1 - t * ANIMATION_CONFIG.wave.dampening);
+            segments.push({ x, y: wave + yJ + (x - xJ) * slopeJ, w: 0 }); // straight tangent tail
+        }
+
+        // Splice a tail fan into the body's vertex loop at its leftmost (tail-end) edge.
+        let minX = Infinity;
+        for (const v of bodyVerts) if (v.x < minX) minX = v.x;
+        let leftIdx = 0;
+        for (let k = 0; k < bodyVerts.length; k++) {
+            if (bodyVerts[k].x <= minX + 0.01) { leftIdx = k; break; }
+        }
+        const a = bodyVerts[leftIdx];
+        const b = bodyVerts[(leftIdx + 1) % bodyVerts.length];
+        const midY = (a.y + b.y) / 2;
+        // Per-fish size variation: the boid's tailLength (0.9–1.8) scales the fan, with
+        // the top of the range = the current (largest) size and smaller fish below it.
+        const tailScale = Math.min(1, 0.55 + 0.45 * (tailLength - 0.9) / 0.9);
+        const reach = 7.5 * tailScale, flare = 3.6 * tailScale;
+        // A forked koi caudal fin: narrow wrist, flared lobes, a soft center notch.
+        const fan = [
+            { x: minX - reach * 0.25, y: midY + flare * 0.35 }, // wrist (bottom)
+            { x: minX - reach * 0.9,  y: midY + flare },         // lower lobe flare
+            { x: minX - reach,        y: midY + flare * 0.4 },   // lower tip
+            { x: minX - reach * 0.8,  y: midY },                 // center notch (fork)
+            { x: minX - reach,        y: midY - flare * 0.4 },   // upper tip
+            { x: minX - reach * 0.9,  y: midY - flare },         // upper lobe flare
+            { x: minX - reach * 0.25, y: midY - flare * 0.35 },  // wrist (top)
+        ];
+        const verts = [...bodyVerts.slice(0, leftIdx + 1), ...fan, ...bodyVerts.slice(leftIdx + 1)];
+        return { verts, segments };
+    }
+
     drawBodyFromSVG(context, segmentPositions, svgVertices, shapeParams, sizeScale, hue, saturation, brightness) {
         // Guard: Validate inputs
         if (!svgVertices || !Array.isArray(svgVertices) || svgVertices.length === 0) {
@@ -1171,6 +1379,7 @@ export class KoiRenderer {
             deformationType: 'wave',
             deformationParams: {
                 segmentPositions,
+                sizeScale, // enables rib rotation (normal-ribbon bend) for the body outline
                 numSegments: segmentPositions.length
             },
             positionX: 0,
@@ -1308,40 +1517,37 @@ export class KoiRenderer {
             return; // Invalid body texture
         }
 
-        // Calculate body bounds
-        const firstSeg = segmentPositions[0];
-        const lastSeg = segmentPositions[segmentPositions.length - 1];
+        const segs = segmentPositions;
+        const n = segs.length;
+        if (n < 2) return;
 
-        // Body extends from head to tail
-        const bodyWidth = Math.abs(firstSeg.x - lastSeg.x);
-
-        // Find maximum segment width (optimized - no intermediate array)
-        let bodyHeight = 0;
-        for (let i = 0; i < segmentPositions.length; i++) {
-            if (segmentPositions[i].w > bodyHeight) {
-                bodyHeight = segmentPositions[i].w;
-            }
+        // ONE flat brush rect (a subtle sumi-e wash — slicing it made the fish look segmented),
+        // sized to the whole DEFORMED body incl. the head so nothing is left untextured.
+        // segment.y is SVG units → ×sizeScale. Fixing centerY/size to the deformed bbox (not a
+        // fixed rect at y=0) covers the arc-displaced head → fixes the light head. Clipped to
+        // the body+head outline anyway.
+        let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+        for (let i = 0; i < n; i++) {
+            const s = segs[i], sy = s.y * sizeScale;
+            if (s.x < minX) minX = s.x;
+            if (s.x > maxX) maxX = s.x;
+            if (sy - s.w < minY) minY = sy - s.w;
+            if (sy + s.w > maxY) maxY = sy + s.w;
         }
+        maxX += (shapeParams.headX + shapeParams.headWidth) * sizeScale; // head sits ahead of segment[0]
+        const centerX = (minX + maxX) / 2;
+        const centerY = (minY + maxY) / 2;
+        const textureWidth = (maxX - minX) * 1.1;
+        const textureHeight = (maxY - minY) * 1.1;
 
-        // Center position (middle of body)
-        const centerX = (firstSeg.x + lastSeg.x) / 2;
-        const centerY = 0;
-
-        // Use original texture to preserve dark brush areas (authentic sumi-e)
-        // Dark areas in the original brushstroke will appear as darker colors
-        // This creates more natural brush texture variation vs alpha-only approach
         context.push();
         context.translate(centerX, centerY);
-
-        // Apply color tint and draw with MULTIPLY to preserve luminosity
         context.tint(hue, saturation, brightness, BRUSH_TEXTURE_CONFIG.BODY_TEXTURE_ALPHA);
         context.blendMode(context.MULTIPLY);
         context.imageMode(context.CENTER);
-        const textureWidth = bodyWidth * BRUSH_TEXTURE_CONFIG.BODY_TEXTURE_SCALE;
-        const textureHeight = bodyHeight * BRUSH_TEXTURE_CONFIG.BODY_TEXTURE_SCALE;
         context.image(bodyTexture, 0, 0, textureWidth, textureHeight);
         context.noTint();
-
+        context.blendMode(context.BLEND);
         context.pop();
     }
 
@@ -1360,6 +1566,13 @@ export class KoiRenderer {
         ctx.save();
         ctx.beginPath();
 
+        // The clip region is body ∪ head, but the canvas nonzero rule fills the UNION only if
+        // both subpaths wind the SAME way — if they wind oppositely their overlap (the head∩body
+        // intersection) cancels to a hole and loses texture. Track the body winding and draw the
+        // head to match it.
+        const winding = (pts) => { let a = 0; for (let i = 0; i < pts.length; i++) { const p = pts[i], q = pts[(i + 1) % pts.length]; a += p.x * q.y - q.x * p.y; } return Math.sign(a); };
+        let bodyWinding = 0;
+
         // Create body outline path
         if (svgVertices.body && Array.isArray(svgVertices.body) && svgVertices.body.length > 0) {
             // Use SVG body outline
@@ -1370,6 +1583,7 @@ export class KoiRenderer {
                     ctx.lineTo(bodyOutline[i].x, bodyOutline[i].y);
                 }
                 ctx.closePath();
+                bodyWinding = winding(bodyOutline);
             }
         } else {
             // Use procedural body outline
@@ -1397,14 +1611,22 @@ export class KoiRenderer {
             const headPos = segmentPositions[0];
             if (!headPos) return; // Guard: ensure head segment exists
 
-            const headOffsetX = shapeParams.headX * sizeScale;
-
-            ctx.moveTo(headPos.x + headOffsetX + svgVertices.head[0].x * sizeScale,
-                      headPos.y + svgVertices.head[0].y * sizeScale);
-            for (let i = 1; i < svgVertices.head.length; i++) {
-                const v = svgVertices.head[i];
-                ctx.lineTo(headPos.x + headOffsetX + v.x * sizeScale,
-                          headPos.y + v.y * sizeScale);
+            // Match drawHeadFromSVG EXACTLY: centre at (headX, headPos.y·sizeScale) and rotate
+            // by the local head tangent. The old code used headPos.y unscaled + no rotation, so
+            // the clip head diverged from the drawn head → the texture painted a ghost "head".
+            const cx = headPos.x + shapeParams.headX * sizeScale;
+            const cy = headPos.y * sizeScale;
+            const h1 = segmentPositions[1] || headPos;
+            const headAngle = Math.atan2((headPos.y - h1.y) * sizeScale, headPos.x - h1.x);
+            const ca = Math.cos(headAngle), sa = Math.sin(headAngle);
+            const hx = (v) => cx + (v.x * sizeScale) * ca - (v.y * sizeScale) * sa;
+            const hy = (v) => cy + (v.x * sizeScale) * sa + (v.y * sizeScale) * ca;
+            // Draw the head with the body's winding so body∪head fills (no cancelled overlap).
+            const headPts = svgVertices.head.map((v) => ({ x: hx(v), y: hy(v) }));
+            const order = (bodyWinding !== 0 && winding(headPts) === -bodyWinding) ? headPts.slice().reverse() : headPts;
+            ctx.moveTo(order[0].x, order[0].y);
+            for (let i = 1; i < order.length; i++) {
+                ctx.lineTo(order[i].x, order[i].y);
             }
             ctx.closePath();
         } else {
@@ -1438,10 +1660,13 @@ export class KoiRenderer {
             return [];
         }
 
-        // Apply the same wave deformation as drawBodyFromSVG to match animated body
+        // Apply the SAME wave deformation as drawBodyFromSVG (incl. rib rotation via sizeScale)
+        // so the texture clip matches the drawn body exactly — otherwise the base fill shows
+        // through as a lighter "ghost" where the two diverge.
         const deformedVertices = this.applyWaveDeformation(svgVertices, {
             segmentPositions,
-            numSegments: segmentPositions.length
+            numSegments: segmentPositions.length,
+            sizeScale
         });
 
         // Then scale the deformed vertices to world space
@@ -1565,7 +1790,7 @@ export class KoiRenderer {
      * @param {number} saturation - HSB saturation
      * @param {number} brightness - HSB brightness
      */
-    drawHeadFromSVG(context, headSegment, svgVertices, shapeParams, sizeScale, hue, saturation, brightness) {
+    drawHeadFromSVG(context, headSegment, svgVertices, shapeParams, sizeScale, hue, saturation, brightness, headAngle = 0) {
         // Guard: Validate inputs
         if (!svgVertices || !Array.isArray(svgVertices) || svgVertices.length === 0) {
             return; // Cannot draw head without vertices
@@ -1574,15 +1799,21 @@ export class KoiRenderer {
             return; // Cannot position head without segment
         }
 
-        const headX = headSegment.x + shapeParams.headX * sizeScale;
-        const headY = headSegment.y;
+        // Head anchor on the spine. NOTE: segment.y is in SVG units (the deform scales it by
+        // sizeScale), so it MUST be scaled here to sit at the arc-displaced head position —
+        // otherwise the head lags ~sizeScale× toward the axis. Head + eyes are drawn in one
+        // translated + rotated frame so they follow the local arc tangent (headAngle).
+        const cx = headSegment.x + shapeParams.headX * sizeScale;
+        const cy = headSegment.y * sizeScale;
+        context.push();
+        context.translate(cx, cy);
+        context.rotate(headAngle);
 
-        // Draw head shape from SVG with static deformation (no animation)
         this.drawSVGShape(context, svgVertices, {
             deformationType: 'static', // No animation for head
             deformationParams: {},
-            positionX: headX,
-            positionY: headY,
+            positionX: 0,
+            positionY: 0,
             rotation: 0,
             scale: sizeScale,
             hue,
@@ -1592,25 +1823,14 @@ export class KoiRenderer {
             mirror: 'none'
         });
 
-        // Eyes are always drawn procedurally (precise, small details)
-        // Rendered on top of SVG head shape
+        // Eyes, relative to the head centre so they rotate with the head.
         context.fill(0, 0, RENDERING_CONFIG.color.eyeBrightness, RENDERING_CONFIG.opacity.eyes);
+        const eyeX = (shapeParams.eyeX - shapeParams.headX) * sizeScale;
+        const eyeSize = shapeParams.eyeSize * sizeScale;
+        context.ellipse(eyeX, shapeParams.eyeYTop * sizeScale, eyeSize, eyeSize);
+        context.ellipse(eyeX, shapeParams.eyeYBottom * sizeScale, eyeSize, eyeSize);
 
-        // Left eye (top)
-        context.ellipse(
-            headSegment.x + shapeParams.eyeX * sizeScale,
-            headSegment.y + shapeParams.eyeYTop * sizeScale,
-            shapeParams.eyeSize * sizeScale,
-            shapeParams.eyeSize * sizeScale
-        );
-
-        // Right eye (bottom)
-        context.ellipse(
-            headSegment.x + shapeParams.eyeX * sizeScale,
-            headSegment.y + shapeParams.eyeYBottom * sizeScale,
-            shapeParams.eyeSize * sizeScale,
-            shapeParams.eyeSize * sizeScale
-        );
+        context.pop();
     }
 
     /**
@@ -1626,7 +1846,7 @@ export class KoiRenderer {
      * @param {number} brightness - HSB brightness
      * @param {Array<{x,y}>} [svgVertices=null] - Optional SVG vertices for head
      */
-    drawHead(context, headSegment, shapeParams, sizeScale, hue, saturation, brightness, svgVertices = null) {
+    drawHead(context, headSegment, shapeParams, sizeScale, hue, saturation, brightness, svgVertices = null, headAngle = 0) {
         // Guard: Validate head segment
         if (!headSegment) {
             return; // Cannot draw head without segment
@@ -1634,7 +1854,7 @@ export class KoiRenderer {
 
         // Use SVG if provided, otherwise use procedural rendering
         if (svgVertices && Array.isArray(svgVertices) && svgVertices.length > 0) {
-            this.drawHeadFromSVG(context, headSegment, svgVertices, shapeParams, sizeScale, hue, saturation, brightness);
+            this.drawHeadFromSVG(context, headSegment, svgVertices, shapeParams, sizeScale, hue, saturation, brightness, headAngle);
             return;
         }
 
