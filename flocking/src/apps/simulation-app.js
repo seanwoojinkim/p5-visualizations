@@ -52,8 +52,8 @@ const isSmallScreen = window.innerWidth < 1024;
 
 // Parameters with device-specific defaults
 let params = {
-    pixelScale: isMobile ? 2 : (isSmallScreen ? 2 : 2),  // Changed from 4 to 2 for desktop
-    numBoids: isMobile ? 20 : (isSmallScreen ? 50 : 80),
+    pixelScale: isMobile ? 5 : (isSmallScreen ? 2 : 2),  // Mobile: 5 for balance of quality/performance
+    numBoids: isMobile ? 15 : (isSmallScreen ? 50 : 80),  // Mobile: 15 fish (scalable based on FPS)
     maxSpeed: 0.5,
     maxForce: 0.05,  // Reduced from 0.1 for smoother steering (matches Processing standard)
     separationWeight: 0.9,  // Linear inverse (1/d) forces allow higher separation without jerky movement
@@ -63,11 +63,10 @@ let params = {
     audioReactivity: 0.5
 };
 
-// Base size scale to compensate for pixelScale changes
-// For koi: baseSizeScale equals pixelScale to properly compensate for buffer scaling
-// For lilypads/blossoms: baseline is pixelScale=2 (their base sizes were designed for that)
-const baseSizeScale = params.pixelScale;
-const environmentSizeScale = params.pixelScale / 2;  // Baseline: pixelScale=2 → scale=1.0
+// Base size scale - artistic sizing control
+// Mobile gets smaller fish due to performance constraints (less detail visible at pixelScale=6)
+const baseSizeScale = isMobile ? 1.5 : 2.0;  // Mobile: smaller fish for performance
+const environmentSizeScale = 1.0;  // Fixed at 1.0 for consistent environment visual size
 
 // Log device-optimized settings
 const deviceType = isMobile ? 'Mobile' : (isSmallScreen ? 'Tablet' : 'Desktop');

@@ -15,6 +15,6 @@
   },
   "dependencies": {
     "node-unrar-js": "^2.0.2",
-    "wooj-koi": "github:woojdesign/wooj-koi#v0.1.9"
+    "wooj-koi": "github:woojdesign/wooj-koi#v0.1.10"
   }
 }
