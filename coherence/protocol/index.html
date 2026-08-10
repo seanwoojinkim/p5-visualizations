@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vibrational Breathing Protocol — HRV (RMSSD)</title>
+<style>
+    :root {
+        --bg: #0d1017; --panel: #161b26; --panel2: #1d2330; --line: #2a3242;
+        --ink: #e8edf7; --muted: #8b97ad; --accent: #6ec8ff; --good: #57d99a; --bad: #ff8f8f;
+    }
+    * { box-sizing: border-box; }
+    body {
+        margin: 0; background: var(--bg); color: var(--ink);
+        font: 15px/1.5 system-ui, -apple-system, sans-serif;
+        padding: 24px; max-width: 900px; margin: 0 auto;
+    }
+    h1 { font-size: 20px; margin: 0 0 2px; }
+    .sub, .muted { color: var(--muted); font-size: 13px; }
+    .row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+    .between { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+    .pill {
+        font-size: 12px; padding: 4px 10px; border-radius: 999px;
+        background: var(--panel2); border: 1px solid var(--line); color: var(--muted);
+    }
+    .pill.ok { color: var(--good); border-color: #274a3a; }
+    .pill.bad { color: var(--bad); border-color: #4a2727; }
+    .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; margin-top: 16px; }
+    .hidden { display: none; }
+    label { display: block; font-size: 12px; color: var(--muted); margin: 10px 0 4px; }
+    select, input[type=number], input[type=text] {
+        width: 100%; background: var(--panel2); border: 1px solid var(--line);
+        color: var(--ink); border-radius: 8px; padding: 8px 10px; font: inherit;
+    }
+    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    button {
+        background: var(--accent); color: #06202e; border: 0; border-radius: 9px;
+        padding: 10px 16px; font: 600 14px system-ui; cursor: pointer;
+    }
+    button.ghost { background: transparent; color: var(--muted); border: 1px solid var(--line); }
+    button:active { transform: translateY(1px); }
+    /* Pacer */
+    .stage { position: relative; }
+    #pacer { width: 100%; height: 360px; display: block; background:
+        radial-gradient(circle at 50% 45%, #131a26 0%, #0d1017 70%); border-radius: 14px; }
+    .phaseHead { position: absolute; top: 14px; left: 16px; }
+    .phaseHead b { font-size: 15px; }
+    #phaseTimer { position: absolute; top: 14px; right: 16px; font: 700 22px ui-monospace, monospace; color: var(--accent); }
+    #washinTag { position: absolute; bottom: 14px; left: 16px; font-size: 11px; color: #ffcf6e;
+        transition: opacity .4s; }
+    .bar { height: 5px; background: var(--panel2); border-radius: 3px; margin-top: 10px; overflow: hidden; }
+    .bar > div { height: 100%; width: 0; background: var(--accent); transition: width .3s; }
+    /* Stats */
+    .stats { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-top: 14px; }
+    .stat { background: var(--panel2); border: 1px solid var(--line); border-radius: 10px; padding: 10px; text-align: center; }
+    .stat .v { font: 700 22px ui-monospace, monospace; }
+    .stat .k { font-size: 11px; color: var(--muted); margin-top: 2px; }
+    /* Table */
+    table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 14px; }
+    th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--line); }
+    th { color: var(--muted); font-weight: 600; font-size: 12px; }
+    td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+    .good { color: var(--good); } .bad { color: var(--bad); }
+    #carryover { margin-top: 14px; font-size: 15px; }
+    #carryover .sub { font-size: 12px; color: var(--muted); margin-top: 4px; }
+    .hist-row { display: grid; grid-template-columns: 1.6fr 1fr 1fr; gap: 8px; padding: 6px 0;
+        border-bottom: 1px solid var(--line); font-size: 13px; }
+    output { color: var(--accent); font-weight: 700; }
+    input[type=range] { width: 100%; }
+</style>
+</head>
+<body>
+    <div class="between">
+        <div>
+            <h1>Vibrational Breathing Protocol</h1>
+            <div class="sub">N=1 vagal-tone validation · RMSSD from Polar H10</div>
+        </div>
+        <span id="statusPill" class="pill bad">bridge ✗</span>
+    </div>
+
+    <!-- Live stats always visible -->
+    <div class="stats">
+        <div class="stat"><div class="v" id="hrVal">—</div><div class="k">HR bpm</div></div>
+        <div class="stat"><div class="v" id="rmssdVal">—</div><div class="k">RMSSD ms (60s)</div></div>
+        <div class="stat"><div class="v" id="lnrmssdVal">—</div><div class="k">ln RMSSD</div></div>
+        <div class="stat"><div class="v" id="coverageVal">—</div><div class="k">window</div></div>
+        <div class="stat"><div class="v" id="artifactVal">—</div><div class="k">artifacts</div></div>
+    </div>
+
+    <!-- SETUP -->
+    <div id="setup" class="panel">
+        <div class="row between">
+            <b>New session</b>
+            <span class="muted">bridge: <code>hrv-monitor/run.sh</code> · ws://localhost:8765</span>
+        </div>
+        <label>Preset</label>
+        <select id="preset"></select>
+        <div class="grid2">
+            <div>
+                <label>Posture</label>
+                <select id="posture">
+                    <option>seated</option><option>supine</option><option>standing</option>
+                </select>
+            </div>
+            <div>
+                <label>Notes</label>
+                <input type="text" id="notes" placeholder="time of day, context…">
+            </div>
+            <div>
+                <label>Minutes since caffeine (blank = n/a)</label>
+                <input type="number" id="caffeine" min="0" placeholder="e.g. 120">
+            </div>
+            <div>
+                <label>Minutes since last meal (blank = n/a)</label>
+                <input type="number" id="meal" min="0" placeholder="e.g. 90">
+            </div>
+        </div>
+        <label>How calm do you feel right now? <output id="preCalmOut">5</output> <span class="muted">(1 = very anxious · 10 = very calm)</span></label>
+        <input type="range" id="preCalm" min="1" max="10" value="5"
+               oninput="document.getElementById('preCalmOut').textContent=this.value">
+        <div class="row" style="margin-top:16px">
+            <button id="startBtn">Start session</button>
+            <span class="muted">Only the protocol phase is paced. Baseline &amp; recovery are natural breathing.</span>
+        </div>
+    </div>
+
+    <!-- RUN -->
+    <div id="runView" class="panel hidden">
+        <div class="stage">
+            <canvas id="pacer"></canvas>
+            <div class="phaseHead"><b id="phaseLabel">Baseline</b><div class="sub" id="phaseHint"></div></div>
+            <div id="phaseTimer">0:00</div>
+            <div id="washinTag">● wash-in — first seconds excluded from phase RMSSD</div>
+        </div>
+        <div class="bar"><div id="overallBar"></div></div>
+        <div class="row" style="margin-top:14px">
+            <button id="abortBtn" class="ghost">Abort</button>
+            <span class="muted">Sit still, breathe through the nose. Hum on the exhale during the protocol phase.</span>
+        </div>
+    </div>
+
+    <!-- END -->
+    <div id="endCard" class="panel hidden">
+        <b>Session complete</b>
+        <table>
+            <thead><tr>
+                <th>Phase</th><th class="num">RMSSD</th><th class="num">ln</th>
+                <th class="num">HR</th><th class="num">beats</th><th class="num">artifacts</th><th class="num">coverage</th>
+            </tr></thead>
+            <tbody id="summaryBody"></tbody>
+        </table>
+        <div id="carryover"></div>
+        <label style="margin-top:16px">How calm do you feel now? <output id="postCalmOut">5</output></label>
+        <input type="range" id="postCalm" min="1" max="10" value="5"
+               oninput="document.getElementById('postCalmOut').textContent=this.value">
+        <div class="row" style="margin-top:14px">
+            <button id="saveRatingBtn">Save rating</button>
+            <button id="exportCsvBtn" class="ghost">Export beats CSV</button>
+            <button id="exportJsonBtn" class="ghost">Export JSON</button>
+            <button id="newBtn" class="ghost">New session</button>
+            <span class="muted" id="ratingSaved"></span>
+        </div>
+    </div>
+
+    <div class="panel">
+        <b>Recent sessions</b>
+        <div id="history" style="margin-top:8px"></div>
+    </div>
+
+    <script type="module" src="./app.js"></script>
+</body>
+</html>
